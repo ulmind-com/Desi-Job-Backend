@@ -12,10 +12,27 @@ services:
         value: production
       - key: BRAND_COLOR
         value: "#17324D"
+      # Required in production: website CMS edits are persisted to MongoDB
+      # (Render's filesystem is wiped on every deploy/restart).
       - key: MONGODB_URI
         sync: false
+      - key: DATABASE_NAME
+        value: desijobs_prod
       - key: SECRET_KEY
         generateValue: true
+      # Admin login for the CMS / admin panel — set a strong, private password in the Render dashboard.
+      - key: SUPER_ADMIN_EMAIL
+        sync: false
+      - key: SUPER_ADMIN_DEFAULT_PASSWORD
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: ADMIN_URL
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: CLOUDINARY_URL
+        sync: false
       - key: FIREBASE_PROJECT_ID
         sync: false
       - key: FIREBASE_SERVICE_ACCOUNT_JSON

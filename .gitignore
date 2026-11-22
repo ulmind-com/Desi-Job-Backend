@@ -51,3 +51,6 @@ uploads/resumes/*
 *.swp
 *.swo
 .DS_Store
+
+# Runtime CMS content (edited from the admin panel)
+/data/

@@ -1,0 +1,381 @@
+{
+  "site": {
+    "brand_top": "SERVICE",
+    "brand_bottom": "FINDER",
+    "post_task_label": "Post a Task",
+    "nav": [
+      {
+        "name": "Home",
+        "href": "/",
+        "children": [
+          { "name": "Home", "href": "/" },
+          { "name": "Popular Categories", "href": "/categories" },
+          { "name": "How It Works", "href": "/features" }
+        ]
+      },
+      { "name": "Provider Page", "href": "/jobs", "children": [] },
+      {
+        "name": "Provider Account",
+        "href": "/dashboard",
+        "children": [
+          { "name": "My Dashboard", "href": "/dashboard" },
+          { "name": "Post a Task", "href": "/post-job" },
+          { "name": "Sign In", "href": "/login" },
+          { "name": "Create Account", "href": "/register" }
+        ]
+      },
+      {
+        "name": "Features",
+        "href": "/features",
+        "children": [
+          { "name": "All Features", "href": "/features" },
+          { "name": "AI Resume Builder", "href": "/resume-builder" },
+          { "name": "Categories", "href": "/categories" }
+        ]
+      },
+      { "name": "Blog", "href": "/blog", "children": [] },
+      { "name": "Contact Us", "href": "/contact", "children": [] },
+      {
+        "name": "Pages",
+        "href": "/pages",
+        "children": [
+          { "name": "All Pages", "href": "/pages" },
+          { "name": "Browse Jobs", "href": "/jobs" },
+          { "name": "Categories", "href": "/categories" },
+          { "name": "AI Resume Builder", "href": "/resume-builder" },
+          { "name": "Post a Job", "href": "/post-job" }
+        ]
+      }
+    ]
+  },
+  "hero": {
+    "rating_text": "4.9 Rating with 1 Million + Happy Customers",
+    "headline_before": "We Get an",
+    "headline_highlight": "experienced",
+    "headline_after": "services providers",
+    "images": [
+      "/hero/hero_1.jpg",
+      "/hero/hero_2.jpg",
+      "/hero/hero_3.jpg",
+      "/hero/hero_8.jpg",
+      "/hero/hero_12.jpg",
+      "/hero/hero_11.jpg",
+      "/hero/hero_2.jpg",
+      "/hero/hero_7.jpg",
+      "/hero/hero_8.jpg",
+      "/hero/hero_11.jpg",
+      "/hero/hero_12.jpg",
+      "/hero/hero_3.jpg",
+      "/hero/hero_1.jpg"
+    ],
+    "keyword_placeholder": "Keyword",
+    "search_button": "Search Now",
+    "countries": ["India", "USA", "Canada", "UK"],
+    "cities": ["Kolkata", "Mumbai", "Delhi", "Bengaluru", "New York", "San Francisco", "Chicago"]
+  },
+  "categories": {
+    "pill": "Categories",
+    "title": "Popular Categories",
+    "button_label": "View All Categories",
+    "items": [
+      { "name": "Automotive", "providers": 4, "icon": "car" },
+      { "name": "Beauty and Personal Care", "providers": 2, "icon": "sparkles" },
+      { "name": "Business", "providers": 4, "icon": "handshake" },
+      { "name": "Cab Service", "providers": 1, "icon": "taxi" },
+      { "name": "Cafe", "providers": 0, "icon": "coffee" },
+      { "name": "Car care and Servicing", "providers": 2, "icon": "wrench" },
+      { "name": "Car Dealers", "providers": 1, "icon": "dollar" },
+      { "name": "Car Driving", "providers": 1, "icon": "steering" },
+      { "name": "Cardiologist", "providers": 0, "icon": "heart" },
+      { "name": "Carpainter", "providers": 1, "icon": "hammer" }
+    ],
+    "more_items": [
+      { "name": "Electrician", "providers": 3, "icon": "zap" },
+      { "name": "House Painting", "providers": 2, "icon": "paint" },
+      { "name": "Movers and Packers", "providers": 2, "icon": "truck" },
+      { "name": "Tutors and Teaching", "providers": 5, "icon": "education" },
+      { "name": "Software & IT", "providers": 6, "icon": "laptop" },
+      { "name": "Gardening", "providers": 1, "icon": "leaf" }
+    ]
+  },
+  "steps": {
+    "pill": "Steps",
+    "title": "How Service Finder Works",
+    "subtitle": "It's easy to start with us with these simple steps",
+    "items": [
+      { "title": "Describe Your Task", "description": "This helps us determine which Taskers are best for your job" },
+      { "title": "Choose a Tasker", "description": "This helps us determine which Taskers are best for your job" },
+      { "title": "Live Smarter", "description": "This helps us determine which Taskers are best for your job" }
+    ]
+  },
+  "recent_jobs": {
+    "badge": "Recent Opportunities",
+    "title": "Recent Job Posts & Positions",
+    "subtitle": "Live verified vacancies with flexible compensation ($/Day, $/Month, $/Hour)",
+    "link_label": "View all openings"
+  },
+  "resume_banner": {
+    "eyebrow": "AI Photo Resume",
+    "title": "Got a handwritten resume on paper? Just take a photo.",
+    "text": "Our AI instantly reads handwriting or printed papers, converts it into an ATS-friendly standardized resume, and prepares it for instant 1-click job applications.",
+    "primary_label": "Snap Resume Photo",
+    "secondary_label": "Post a Job Opening"
+  },
+  "features_page": {
+    "title": "Features",
+    "subtitle": "Everything you need to find work or hire a trusted service provider.",
+    "section_title": "Why Choose Service Finder",
+    "items": [
+      { "icon": "camera", "title": "AI Photo Resume", "text": "Snap a paper resume and our AI turns it into an ATS-friendly profile in seconds.", "href": "/resume-builder" },
+      { "icon": "shield", "title": "Verified Providers", "text": "Every provider and employer is moderated before they appear on the platform.", "href": "/jobs" },
+      { "icon": "zap", "title": "1-Click Apply", "text": "Apply to any job with your saved resume — no repeated forms.", "href": "/jobs" },
+      { "icon": "search", "title": "Smart Search", "text": "Filter by category, country, city, work mode and salary period.", "href": "/jobs" },
+      { "icon": "bell", "title": "Instant Alerts", "text": "Get notified the moment an employer views or shortlists your application.", "href": "/dashboard" },
+      { "icon": "users", "title": "Post a Task", "text": "Employers can post daily-wage, part-time or full-time tasks in minutes.", "href": "/post-job" }
+    ]
+  },
+  "blog": {
+    "title": "Our Blog",
+    "subtitle": "Tips, guides and news for service providers and employers.",
+    "posts": [
+      { "image": "/hero/hero_1.jpg", "tag": "Career Tips", "title": "How to land your first workshop technician job", "date": "Nov 18, 2026", "author": "Admin" },
+      { "image": "/hero/hero_11.jpg", "tag": "Home Services", "title": "7 questions to ask before hiring a cleaning provider", "date": "Nov 12, 2026", "author": "Admin" },
+      { "image": "/hero/hero_2.jpg", "tag": "Daily Wage", "title": "Daily-wage work: how to get paid on time, every time", "date": "Nov 05, 2026", "author": "Admin" },
+      { "image": "/hero/hero_7.jpg", "tag": "Safety", "title": "Electrical work safety checklist for every site", "date": "Oct 28, 2026", "author": "Admin" },
+      { "image": "/hero/hero_3.jpg", "tag": "Resume", "title": "Turn a handwritten resume into an ATS profile with AI", "date": "Oct 20, 2026", "author": "Admin" },
+      { "image": "/hero/hero_8.jpg", "tag": "Employers", "title": "Writing a task post that attracts skilled providers", "date": "Oct 14, 2026", "author": "Admin" }
+    ]
+  },
+  "contact": {
+    "title": "Contact Us",
+    "subtitle": "Questions about a job, a provider or your account? We are here to help.",
+    "form_title": "Send us a message",
+    "success_text": "Thanks! Your message has been noted — our team will reply by email.",
+    "info": [
+      { "icon": "phone", "label": "Call Us", "value": "+1 (800) 555-DESI" },
+      { "icon": "mail", "label": "Email Us", "value": "support@desijobs.com" },
+      { "icon": "map", "label": "Visit Us", "value": "Global Remote & Local Job Centers" }
+    ]
+  },
+  "footer": {
+    "brand": "DESI JOBS",
+    "about": "Leading verified recruitment and job application platform. Connecting skilled job seekers, verified professionals, and employers seamlessly.",
+    "location": "Global Remote & Local Job Centers",
+    "email": "support@desijobs.com",
+    "phone": "+1 (800) 555-DESI",
+    "note": "Moderation Hours: 24/7 automated AI verification",
+    "copyright": "© 2026 Desi Jobs Portal & Services. All rights reserved.",
+    "columns": [
+      {
+        "title": "For Job Seekers",
+        "links": [
+          { "name": "Browse Latest Jobs", "href": "/jobs" },
+          { "name": "AI Photo Resume Builder", "href": "/resume-builder" },
+          { "name": "Candidate Profile", "href": "/dashboard" },
+          { "name": "Daily Wage & Shifts", "href": "/jobs?employment_type=Daily+Wage" }
+        ]
+      },
+      {
+        "title": "For Employers",
+        "links": [
+          { "name": "Post a New Job Opening", "href": "/post-job" },
+          { "name": "Review Applications", "href": "/dashboard" },
+          { "name": "Hiring Guidelines", "href": "/features" },
+          { "name": "Contact Support", "href": "/contact" }
+        ]
+      }
+    ]
+  },
+  "admin_dashboard": {
+    "subtitle": "Ask anything, share your thoughts, or let's uncover insights together.",
+    "insights_title": "Top 3 candidates likely to convert this week",
+    "top_candidates": [
+      { "name": "Alex Dom Bringer", "role": "Frontend Developer", "score": 66.2, "avatar": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150" },
+      { "name": "Elena Rostova", "role": "Full-Stack Engineer", "score": 61.8, "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150" },
+      { "name": "Marcus Vance", "role": "UI/UX Designer", "score": 58.4, "avatar": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150" }
+    ],
+    "stats": [
+      { "label": "Active jobs", "value": 32, "change": "+3%", "positive": true, "note": "this month" },
+      { "label": "Candidates in pipeline", "value": 232, "change": "-13.3%", "positive": false, "note": "this month" },
+      { "label": "Interviewed this week", "value": 35, "change": "+3%", "positive": true, "note": "this month" }
+    ],
+    "funnel": {
+      "max": 60000,
+      "highlight": 1,
+      "stages": [
+        { "stage": "Applications", "value": 46200 },
+        { "stage": "Shortlisted", "value": 37500 },
+        { "stage": "Interviews", "value": 29100 },
+        { "stage": "Offers", "value": 18600 },
+        { "stage": "Hires", "value": 12900 }
+      ],
+      "explore_title": "What would you like to explore next?",
+      "explore_text": "I want to know what caused the drop-off from shortlisted to",
+      "explore_link": "interviews.",
+      "explore_button": "Analyze drop-off"
+    },
+    "interviews": {
+      "days": [
+        { "day": "M", "date": 15 },
+        { "day": "T", "date": 16 },
+        { "day": "W", "date": 17 },
+        { "day": "T", "date": 18 },
+        { "day": "F", "date": 19 },
+        { "day": "S", "date": 20 }
+      ],
+      "selected": 2,
+      "items": [
+        { "title": "Meet with John Miller", "time": "8.30am to 9.00am", "color": "#86EFAC", "app": "meet" },
+        { "title": "Meet with John Miller", "time": "8.30am to 9.00am", "color": "#1D4ED8", "app": "meet" },
+        { "title": "Meet with Kevin Liu", "time": "8.30am to 9.00am", "color": "#E9A8F2", "app": "teams" },
+        { "title": "Meet with Kevin Liu", "time": "8.30am to 9.00am", "color": "#F4A47C", "app": "teams" }
+      ]
+    },
+    "status": {
+      "screened": 84,
+      "screened_change": "+3%",
+      "interviewed": 48,
+      "segments": [
+        { "value": 52, "color": "#1D5BD8" },
+        { "value": 21, "color": "#D3F5DC" },
+        { "value": 14, "color": "#E9A8F2" },
+        { "value": 7, "color": "#F4A47C" }
+      ],
+      "efficiency_text": "Recruitment efficiency has improved by",
+      "efficiency_value": "+12%",
+      "efficiency_suffix": "compared to last month."
+    },
+    "activity": [
+      { "tag": "AI Action", "tag_color": "#B7F5C5", "time": "2h ago", "title": "AI shortlisted 12 new resumes", "text": "4 top candidates for", "chip": "#UI-Designer-Remote", "suffix": "role." },
+      { "tag": "AI Action", "tag_color": "#F5B5F0", "time": "2h ago", "title": "AI shortlisted 12 new resumes", "text": "4 top candidates for", "chip": "#UI-Designer-Remote", "suffix": "role." }
+    ]
+  },
+  "admin_overview": {
+    "stats": [
+      { "label": "Applications", "value": 1534, "change": "12.67%", "up": true, "highlight": true },
+      { "label": "Shortlisted", "value": 869, "change": "1.98%", "up": false, "highlight": false },
+      { "label": "Hired", "value": 236, "change": "8.35%", "up": true, "highlight": false },
+      { "label": "Rejected", "value": 429, "change": "2.81%", "up": false, "highlight": false }
+    ],
+    "applications_chart": {
+      "range": "13-18 May",
+      "max": 400,
+      "series": [
+        { "label": "13 May", "applied": 320, "shortlisted": 50 },
+        { "label": "14 May", "applied": 350, "shortlisted": 120 },
+        { "label": "15 May", "applied": 300, "shortlisted": 45 },
+        { "label": "16 May", "applied": 340, "shortlisted": 95 },
+        { "label": "17 May", "applied": 310, "shortlisted": 95 },
+        { "label": "18 May", "applied": 360, "shortlisted": 115 }
+      ]
+    },
+    "departments": {
+      "range": "Today",
+      "total": 525,
+      "items": [
+        { "name": "Engineering", "count": 120, "color": "#A8B0F5" },
+        { "name": "Marketing", "count": 110, "color": "#CFEA5C" },
+        { "name": "Sales", "count": 95, "color": "#E6F4B7" },
+        { "name": "Customer Support", "count": 85, "color": "#F1F8DA" },
+        { "name": "Finance", "count": 65, "color": "#E8EBFB" },
+        { "name": "Human Resources", "count": 50, "color": "#D5D9F7" }
+      ]
+    },
+    "resources": {
+      "total": 1000,
+      "items": [
+        { "label": "Job Boards", "value": 350 },
+        { "label": "Employee Referrals", "value": 200 },
+        { "label": "Social Media Campaigns", "value": 300 },
+        { "label": "Recruitment Agencies", "value": 150 }
+      ]
+    },
+    "vacancies": {
+      "count": 104,
+      "items": [
+        { "title": "Software Developer", "icon": "code", "tags": ["Full-time", "Remote"], "salary": "$70K - $90K", "period": "/y", "extra": "", "applicants": 120 },
+        { "title": "Graphic Designer", "icon": "pen", "tags": ["Part-time", "Hybrid"], "salary": "$40K - $55K", "period": "/y", "extra": "(pro-rated)", "applicants": 75 },
+        { "title": "Sales Manager", "icon": "chart", "tags": ["Full-time", "On-site"], "salary": "$65K - $80K", "period": "/y", "extra": "+ comission", "applicants": 75 },
+        { "title": "HR Coordinator", "icon": "user", "tags": ["Contract", "Remote"], "salary": "$50K - $60K", "period": "/y", "extra": "", "applicants": 60 }
+      ]
+    },
+    "tasks": [
+      { "title": "Resume Screening", "category": "Evaluation", "date": "May 27, 2027", "progress": 40 },
+      { "title": "Interview Scheduling", "category": "Engagement", "date": "May 20, 2027", "progress": 60 },
+      { "title": "Candidate Communication", "category": "Relationship", "date": "May 23, 2027", "progress": 30 },
+      { "title": "Offer Management", "category": "Selection", "date": "May 25, 2027", "progress": 50 }
+    ],
+    "schedule": [
+      { "time": "1:00 PM", "title": "Marketing Strategy Presentation", "dept": "Marketing", "tone": "lime" },
+      { "time": "2:30 PM", "title": "HR Policy Update Session", "dept": "Human Resources", "tone": "lime-soft" },
+      { "time": "4:00 PM", "title": "Customer Feedback Analysis", "dept": "Customer Support", "tone": "violet" },
+      { "time": "5:30 PM", "title": "Financial Reporting Session", "dept": "Finance", "tone": "violet-soft" }
+    ],
+    "applicants": {
+      "total": 1242,
+      "tabs": ["All Applicants", "Screening", "Shortlisted", "Interviewing", "Job Offer"],
+      "rows": [
+        { "name": "Alex Boide", "email": "a.boide@hirezy.com", "role": "Software Engineer", "date": "Apr 15, 2027", "type": "Full-time", "status": "Interviewing" },
+        { "name": "Alice Johnson", "email": "a.johnson@hirezy.com", "role": "HR Specialist", "date": "Apr 10, 2027", "type": "Contract", "status": "Shortlisted" },
+        { "name": "Darren Wright", "email": "d.wright@hirezy.com", "role": "Graphic Designer", "date": "Apr 08, 2027", "type": "Part-time", "status": "Screening" },
+        { "name": "Caren Smith", "email": "c.smith@hirezy.com", "role": "Sales Manager", "date": "Apr 02, 2027", "type": "Full-time", "status": "Job Offer" }
+      ]
+    },
+    "activity": [
+      { "icon": "eye", "text": "Darren Wright viewed 15 candidate profiles for the Software Developer position", "time": "10:15 AM" },
+      { "icon": "calendar", "text": "Caren Smith scheduled interviews with 3 candidates for the Marketing Manager role", "time": "9:50 AM" },
+      { "icon": "bell", "text": "Automated Reminder sent to Bob Lee to complete interview feedback", "time": "9:30 AM" }
+    ]
+  },
+  "admin_board": {
+    "kpis": [
+      { "value": "289", "label": "Total Applications", "change": "10%", "up": true },
+      { "value": "243", "label": "Invited Interview", "change": "22%", "up": true },
+      { "value": "175", "label": "Shortlisted Application", "change": "5%", "up": true },
+      { "value": "100", "label": "Hired Application", "change": "12%", "up": false },
+      { "value": "70", "label": "On-Hold Application", "change": "2%", "up": true },
+      { "value": "$100", "label": "Cost Per Hire", "change": "5%", "up": false }
+    ],
+    "open_positions": [
+      { "name": "Project Management", "count": 6 },
+      { "name": "Wordpress", "count": 18 },
+      { "name": "PHP + Laravel", "count": 22 },
+      { "name": "React.JS, Node.JS, Angular.JS, Vue.JS", "count": 36 },
+      { "name": "Android + Flutter", "count": 25 },
+      { "name": "iOS", "count": 12 },
+      { "name": "Design", "count": 30 }
+    ],
+    "hiring_sources": [
+      { "name": "WeWork", "value": 25, "color": "#1E1EF0" },
+      { "name": "Google", "value": 25, "color": "#F08A2E" },
+      { "name": "LinkedIn", "value": 13, "color": "#1E9E46" },
+      { "name": "Indeed", "value": 12, "color": "#4FC3F0" },
+      { "name": "Direct", "value": 12, "color": "#A855F7" },
+      { "name": "Internal", "value": 13, "color": "#F0C22E" }
+    ],
+    "offer_rate": {
+      "value": 80,
+      "quarters": [
+        { "label": "Q1", "accepted": 210, "total": 300 },
+        { "label": "Q2", "accepted": 210, "total": 300 },
+        { "label": "Q3", "accepted": 210, "total": 300 },
+        { "label": "Q4", "accepted": 210, "total": 300 }
+      ]
+    },
+    "pipeline": [
+      { "position": "Sr. Full Stack Engineer", "lead": 14, "applicant": 8, "screening": 8, "first": 6, "second": 6, "final": 6, "offer": 5 },
+      { "position": "iOS Developer", "lead": 20, "applicant": 16, "screening": 14, "first": 14, "second": 12, "final": 8, "offer": 8 },
+      { "position": "Fresher Web Developer", "lead": 42, "applicant": 36, "screening": 36, "first": 32, "second": 28, "final": 20, "offer": 20 },
+      { "position": "Sr. Laravel Developer", "lead": 24, "applicant": 20, "screening": 20, "first": 18, "second": 16, "final": 16, "offer": 13 },
+      { "position": "Sr. UI/UX Designer", "lead": 48, "applicant": 48, "screening": 40, "first": 37, "second": 30, "final": 28, "offer": 20 }
+    ],
+    "dept_requirements": [
+      { "name": "iOS + Flutter", "count": 6 },
+      { "name": "Android + Flutter", "count": 12 },
+      { "name": "PHP + Laravel", "count": 8 },
+      { "name": "Wordpress", "count": 43 },
+      { "name": "Cloud Computing", "count": 2 },
+      { "name": "Design", "count": 8 }
+    ]
+  }
+}
