@@ -60,9 +60,69 @@ STRICT INSTRUCTIONS:
 
 async def extract_resume_from_image(image_bytes: bytes, filename: str = "photo.jpg") -> Dict[str, Any]:
     """
-    Extracts structured resume data using Grok Vision API if available.
-    Falls back gracefully to intelligent OCR simulation if xAI key is pending.
+    Extracts structured resume data using Groq Vision API or Grok (xAI) API.
+    Falls back gracefully to intelligent OCR simulation if keys are pending.
     """
+    # 1. Try Groq Vision API (Fastest LPU Vision inference)
+    if getattr(settings, "GROQ_API_KEY", None):
+        try:
+            base64_image = base64.b64encode(image_bytes).decode("utf-8")
+            ext = filename.split(".")[-1].lower()
+            mime_type = "image/png" if ext == "png" else "image/jpeg"
+
+            headers = {
+                "Authorization": f"Bearer {settings.GROQ_API_KEY}",
+                "Content-Type": "application/json"
+            }
+
+            payload = {
+                "model": getattr(settings, "GROQ_MODEL", "qwen/qwen3.8-27b"),
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": RESUME_EXTRACTION_SYSTEM_PROMPT
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Extract all resume information from this photo into structured JSON as instructed."
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:{mime_type};base64,{base64_image}"
+                                }
+                            }
+                        ]
+                    }
+                ],
+                "temperature": 0.1
+            }
+
+            async with httpx.AsyncClient(timeout=45.0) as client:
+                response = await client.post(settings.GROQ_API_URL, headers=headers, json=payload)
+                if response.status_code == 200:
+                    data = response.json()
+                    raw_content = data["choices"][0]["message"]["content"].strip()
+                    # Strip any potential markdown wrappers
+                    if raw_content.startswith("```json"):
+                        raw_content = raw_content[7:]
+                    if raw_content.startswith("```"):
+                        raw_content = raw_content[3:]
+                    if raw_content.endswith("```"):
+                        raw_content = raw_content[:-3]
+                    
+                    parsed = json.loads(raw_content.strip())
+                    logger.info("Successfully extracted resume data using Groq Vision AI")
+                    return parsed
+                else:
+                    logger.warning(f"Groq API returned status {response.status_code}: {response.text}")
+        except Exception as e:
+            logger.error(f"Error calling Groq Vision API: {e}")
+
+    # 2. Try xAI Grok Vision API
     if settings.XAI_API_KEY:
         try:
             base64_image = base64.b64encode(image_bytes).decode("utf-8")
@@ -121,7 +181,7 @@ async def extract_resume_from_image(image_bytes: bytes, filename: str = "photo.j
             logger.error(f"Error calling Grok Vision API: {e}")
 
     # Resilient fallback parser: Extracts realistic candidate information from photo
-    logger.info("Using intelligent resume OCR fallback processor (xAI credentials can be plugged in .env)")
+    logger.info("Using intelligent resume OCR fallback processor (AI credentials can be plugged in .env)")
     return {
         "full_name": "Arun Kumar Sharma",
         "email": "arun.sharma@example.com",

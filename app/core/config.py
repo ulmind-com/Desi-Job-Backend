@@ -32,7 +32,7 @@ class Settings(BaseSettings):
 
     # Database (MongoDB Atlas)
     MONGODB_URI: str = "mongodb://localhost:27017"
-    DATABASE_NAME: str = "desijobs_db"
+    DATABASE_NAME: str = "desijobs_prod"
 
     # Security & JWT
     SECRET_KEY: str = "desi-jobs-production-secret-jwt-auth-key-2026-very-secure"
@@ -43,7 +43,18 @@ class Settings(BaseSettings):
     FIREBASE_PROJECT_ID: str = ""
     FIREBASE_SERVICE_ACCOUNT_JSON: str = ""
 
-    # AI Integration (Grok / xAI)
+    # Cloudinary Storage
+    CLOUDINARY_CLOUD_NAME: str = ""
+    CLOUDINARY_API_KEY: str = ""
+    CLOUDINARY_API_SECRET: str = ""
+    CLOUDINARY_URL: str = ""
+
+    # Groq Cloud AI (High-speed Vision & LLM)
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "qwen/qwen3.8-27b"
+    GROQ_API_URL: str = "https://api.groq.com/openai/v1/chat/completions"
+
+    # xAI Grok API (Optional)
     XAI_API_KEY: str = ""
     XAI_MODEL: str = "grok-2-vision-1212"
     XAI_API_URL: str = "https://api.x.ai/v1/chat/completions"
