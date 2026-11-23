@@ -38,6 +38,8 @@ venv.bak/
 .env
 .env.local
 .env.*.local
+*firebase*.json
+serviceAccountKey.json
 
 # Uploaded Files
 uploads/photos/*

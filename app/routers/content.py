@@ -17,11 +17,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
 
-from fastapi import APIRouter, Body, Depends, HTTPException
-
+from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile, File
 from app.core.database import db_manager
 from app.core.security import require_admin
+from app.core.config import settings
 from app.services.seed_service import store
+from app.services.cloudinary_service import upload_image
 
 logger = logging.getLogger(__name__)
 
@@ -121,6 +122,49 @@ def _audit(admin: dict, action: str, section: str) -> None:
         "details": f"{action.replace('_', ' ').title()} for section '{section}'",
         "timestamp": datetime.now(timezone.utc),
     })
+
+
+@router.post("/content/upload-image")
+@router.post("/admin/content/upload-image")
+async def upload_cms_image(
+    file: UploadFile = File(...)
+):
+    """
+    Upload an image (photo, banner, logo, avatar) for CMS content.
+    Uploads directly to Cloudinary CDN, or falls back to local storage.
+    Returns the public image URL.
+    """
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Uploaded file must be a valid image (PNG, JPG, WEBP, GIF, SVG)")
+    
+    file_bytes = await file.read()
+    max_bytes = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+    if len(file_bytes) > max_bytes:
+        raise HTTPException(status_code=413, detail=f"Image size exceeds limit of {settings.MAX_UPLOAD_SIZE_MB}MB")
+
+    # 1. Try Cloudinary CDN first
+    cloudinary_result = upload_image(file_bytes, folder="desijobs/cms")
+    if cloudinary_result and cloudinary_result.get("url"):
+        return {
+            "success": True,
+            "url": cloudinary_result["url"],
+            "storage": "cloudinary",
+            "format": cloudinary_result.get("format")
+        }
+
+    # 2. Fallback to persistent local uploads directory
+    cms_dir = Path(settings.UPLOAD_DIR) / "cms"
+    cms_dir.mkdir(parents=True, exist_ok=True)
+    ext = Path(file.filename or "image.jpg").suffix.lower() or ".jpg"
+    filename = f"cms_{uuid.uuid4().hex[:12]}{ext}"
+    target_path = cms_dir / filename
+    target_path.write_bytes(file_bytes)
+    
+    return {
+        "success": True,
+        "url": f"/uploads/cms/{filename}",
+        "storage": "local"
+    }
 
 
 # ---------------------------------------------------------------- public
