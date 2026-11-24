@@ -55,6 +55,12 @@ async def get_current_user_payload(credentials: Optional[HTTPAuthorizationCreden
         )
     return payload
 
+async def get_optional_user_payload(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme)) -> Optional[Dict[str, Any]]:
+    if not credentials:
+        return None
+    token = credentials.credentials
+    return decode_access_token(token)
+
 async def require_auth(payload: Dict[str, Any] = Depends(get_current_user_payload)) -> Dict[str, Any]:
     return payload
 

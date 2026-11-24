@@ -1,25 +1,31 @@
 import os
 import uuid
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException, UploadFile, File, Depends, Response
+from typing import Optional
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, Response
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 from app.schemas.resume import ResumeCreate, ResumeOut, ResumeStructuredData
-from app.core.security import require_auth
+from app.core.security import require_auth, get_optional_user_payload
 from app.core.config import settings
-from app.services.grok_service import extract_resume_from_image
+from app.services.grok_service import extract_resume_from_image, extract_resume_from_text
 from app.services.pdf_service import generate_resume_pdf
 from app.services.seed_service import store
 
 router = APIRouter(prefix="/resumes", tags=["AI Resumes"])
 
+class ParseTextRequest(BaseModel):
+    text: str
+
 @router.post("/process-image")
 async def process_resume_image(
     file: UploadFile = File(...),
-    user: dict = Depends(require_auth)
+    raw_text: Optional[str] = Form(None),
+    user: Optional[dict] = Depends(get_optional_user_payload)
 ):
     """
-    Accepts JPG/PNG image of paper/handwritten resume, processes via Grok AI Vision,
-    and returns editable structured resume JSON.
+    Accepts JPG/PNG image of paper/handwritten resume (with optional OCR text),
+    processes via Groq AI, and returns editable structured resume JSON.
     """
     # Validate extension
     ext = file.filename.split(".")[-1].lower() if file.filename else "jpg"
@@ -38,13 +44,31 @@ async def process_resume_image(
     with open(photo_path, "wb") as f:
         f.write(contents)
 
-    # Call Grok AI / OCR extractor
-    structured_data = await extract_resume_from_image(contents, file.filename or "photo.jpg")
+    # Call AI / OCR extractor
+    structured_data = await extract_resume_from_image(contents, file.filename or "photo.jpg", raw_text)
     
     return {
         "status": "success",
-        "message": "Resume extracted successfully by Grok AI. Please review and confirm your details.",
+        "message": "Resume extracted and generated successfully. Ready for 1-click preview and download.",
         "image_url": f"/uploads/photos/{photo_id}",
+        "extracted_data": structured_data
+    }
+
+@router.post("/parse-text")
+async def parse_resume_text(
+    req: ParseTextRequest,
+    user: Optional[dict] = Depends(get_optional_user_payload)
+):
+    """
+    Directly converts candidate notes, raw text, or bio into a full 1-page professional resume JSON.
+    """
+    if not req.text or len(req.text.strip()) < 3:
+        raise HTTPException(status_code=400, detail="Please provide candidate details or notes.")
+    
+    structured_data = await extract_resume_from_text(req.text)
+    return {
+        "status": "success",
+        "message": "Resume structured successfully by AI.",
         "extracted_data": structured_data
     }
 
