@@ -70,8 +70,8 @@
     ],
     "keyword_placeholder": "Keyword",
     "search_button": "Search Now",
-    "countries": ["India", "USA", "Canada", "UK"],
-    "cities": ["Kolkata", "Mumbai", "Delhi", "Bengaluru", "New York", "San Francisco", "Chicago"]
+    "countries": ["USA"],
+    "cities": ["Dallas", "Houston", "New York", "Chicago", "Atlanta", "Orlando", "Edison", "Los Angeles", "Philadelphia", "Tampa"]
   },
   "categories": {
     "pill": "Categories",

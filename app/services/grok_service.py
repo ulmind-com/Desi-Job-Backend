@@ -186,7 +186,7 @@ async def extract_resume_from_image(image_bytes: bytes, filename: str = "photo.j
         "full_name": "Arun Kumar Sharma",
         "email": "arun.sharma@example.com",
         "phone": "+91 98765 43210",
-        "location": "Kolkata, West Bengal, India",
+        "location": "Dallas, TX, USA",
         "professional_summary": "Dedicated professional with 4+ years of hands-on experience in full-stack web technologies, agile workflows, and high-performance applications.",
         "education": [
             {
