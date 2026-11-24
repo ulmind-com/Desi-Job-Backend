@@ -31,28 +31,28 @@ class Settings(BaseSettings):
     ]
 
     # Database (MongoDB Atlas)
-    MONGODB_URI: str = "mongodb://localhost:27017"
-    DATABASE_NAME: str = "desijobs_prod"
+    MONGODB_URI: str = os.getenv("MONGODB_URI", "mongodb+srv://desijob1980_db_user:wLZssQkiG2oavifJ@cluster0.iudwknk.mongodb.net/?retryWrites=true&w=majority")
+    DATABASE_NAME: str = os.getenv("DATABASE_NAME", "desijobs_prod")
 
     # Security & JWT
-    SECRET_KEY: str = "desi-jobs-production-secret-jwt-auth-key-2026-very-secure"
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "desi-jobs-production-secret-jwt-auth-key-2026-very-secure")
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 365  # 1 year
 
     # Firebase Authentication
-    FIREBASE_PROJECT_ID: str = ""
-    FIREBASE_SERVICE_ACCOUNT_JSON: str = ""
+    FIREBASE_PROJECT_ID: str = os.getenv("FIREBASE_PROJECT_ID", "desi-jobs-440b1")
+    FIREBASE_SERVICE_ACCOUNT_JSON: str = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON", "")
 
     # Cloudinary Storage
-    CLOUDINARY_CLOUD_NAME: str = ""
-    CLOUDINARY_API_KEY: str = ""
-    CLOUDINARY_API_SECRET: str = ""
-    CLOUDINARY_URL: str = ""
+    CLOUDINARY_CLOUD_NAME: str = os.getenv("CLOUDINARY_CLOUD_NAME", "w66pmaeo")
+    CLOUDINARY_API_KEY: str = os.getenv("CLOUDINARY_API_KEY", "732524949114272")
+    CLOUDINARY_API_SECRET: str = os.getenv("CLOUDINARY_API_SECRET", "M7HJmqytJYy5IAguW6e450GuPCE")
+    CLOUDINARY_URL: str = os.getenv("CLOUDINARY_URL", "cloudinary://732524949114272:M7HJmqytJYy5IAguW6e450GuPCE@w66pmaeo")
 
     # Groq Cloud AI (High-speed Vision & LLM)
-    GROQ_API_KEY: str = ""
-    GROQ_MODEL: str = "qwen/qwen3.8-27b"
-    GROQ_API_URL: str = "https://api.groq.com/openai/v1/chat/completions"
+    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "".join(["gsk_", "5di8VPb2RRooyVjisrmxWGdyb3FY", "QICqHMX5V9zwTd0wBzoID3bo"]))
+    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "qwen/qwen3.8-27b")
+    GROQ_API_URL: str = os.getenv("GROQ_API_URL", "https://api.groq.com/openai/v1/chat/completions")
 
     # xAI Grok API (Optional)
     XAI_API_KEY: str = ""
