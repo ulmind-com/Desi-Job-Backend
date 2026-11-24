@@ -25,9 +25,14 @@ class ProjectItem(BaseModel):
 
 class ResumeStructuredData(BaseModel):
     full_name: str
-    email: Optional[EmailStr] = None
+    headline: Optional[str] = None
+    email: Optional[str] = None
     phone: Optional[str] = None
     location: Optional[str] = None
+    age: Optional[str] = None
+    current_job: Optional[str] = None
+    total_experience: Optional[str] = None
+    raw_notes: Optional[str] = None
     professional_summary: Optional[str] = None
     education: List[EducationItem] = []
     experience: List[ExperienceItem] = []

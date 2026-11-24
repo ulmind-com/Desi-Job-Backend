@@ -115,6 +115,19 @@ def generate_resume_pdf(resume_data: Dict[str, Any], resume_id: str = None) -> s
     
     story.append(Paragraph(" | ".join(contact_parts), contact_style))
     story.append(HRFlowable(width="100%", thickness=1.5, color=brand_primary, spaceBefore=2, spaceAfter=8))
+
+    # Candidate Bio Info
+    bio_parts = []
+    if resume_data.get("age"):
+        bio_parts.append(f"<b>Age:</b> {resume_data['age']}")
+    if resume_data.get("current_job"):
+        bio_parts.append(f"<b>Job Status:</b> {resume_data['current_job']}")
+    if resume_data.get("total_experience"):
+        bio_parts.append(f"<b>Total Experience:</b> {resume_data['total_experience']}")
+
+    if bio_parts:
+        story.append(Paragraph(" &bull; ".join(bio_parts), body_style))
+        story.append(Spacer(1, 6))
     
     # 2. Professional Summary
     summary = resume_data.get("professional_summary")

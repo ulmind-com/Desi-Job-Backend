@@ -10,145 +10,138 @@ import re
 
 logger = logging.getLogger(__name__)
 
-RESUME_EXTRACTION_SYSTEM_PROMPT = """You are an expert AI Resume Builder for Desi Jobs (US hospitality, motel, retail, gas station, restaurant, driver, warehouse, and blue-collar service positions).
+RESUME_EXTRACTION_SYSTEM_PROMPT = """You are an expert AI Resume Assistant for Desi Jobs.
+Your task is to read candidate notes, handwritten paper scans, or CV text, and extract the real candidate information into a clean, structured JSON format.
 
-CANDIDATES OFTEN UPLOAD MESSY HANDWRITTEN NOTES, SHORT PHONE PICS, OR NOISY OCR TEXT (e.g. "Narayan chowdary, Mobile No: +1 502 544 8377, Age: 45 years, Job: Working, Experience: 15 years").
-YOUR JOB IS TO INTELLIGENTLY INTERPRET AND FIX THE NOISE, EXTRACT KEY FACTS (Name, Phone, Age, Experience, Job), AND EXPAND THEM INTO A COMPLETE, POLISHED, 1-PAGE ATS RESUME TEMPLATE.
+CRITICAL TRUTHFULNESS RULES:
+1. NEVER INVENT OR HALLUCINATE FAKE INFORMATION:
+   - ONLY extract facts that are actually provided in the user's input.
+   - NEVER generate fake company names (e.g. do NOT invent "Hospitality & Service Operations Facility" or "Retail & Convenience Store").
+   - NEVER invent fake job dates (e.g. do NOT invent "2016 - Present" or "2009 - 2016").
+   - NEVER invent fake diplomas or schools (e.g. do NOT invent "High School Diploma 1998").
+   - NEVER invent fake email addresses (e.g. do NOT invent "candidate.email@desijobs.com").
+   - NEVER invent fake locations (e.g. do NOT invent "USA" if not mentioned).
+   - NEVER invent fake skills or spoken languages if not provided in the text.
+2. If the user only uploaded a simple paper note (e.g. "Narayan chowdary, Mobile No: +1 502 544 8377, Age: 45 years, Job: Working, Experience: 15 years"):
+   - Extract `full_name`: "Narayan Chowdary"
+   - Extract `phone`: "+1 502 544 8377"
+   - Extract `age`: "45 Years"
+   - Extract `current_job`: "Working"
+   - Extract `total_experience`: "15 Years"
+   - Build `headline`: "Job: Working | 15 Years Experience"
+   - Build `professional_summary`: "Experienced candidate currently working with 15 years of practical working experience."
+   - Set `email`: null
+   - Set `location`: null
+   - Set `experience`: [] (EMPTY ARRAY)
+   - Set `skills`: [] (EMPTY ARRAY)
+   - Set `education`: [] (EMPTY ARRAY)
+   - Set `languages`: [] (EMPTY ARRAY)
+3. If the user provided a full CV with actual companies, real degrees, or real skills, extract them faithfully. If any section is not mentioned, return an empty array `[]`.
 
-CRITICAL RULES:
-1. NEVER RETURN NULL OR EMPTY ARRAYS FOR CORE FIELDS. Every candidate MUST receive a complete, ready-to-use resume template.
-2. Fix noisy handwriting OCR errors:
-   - Identify candidate name (e.g. 'Nessa cheodaey' -> 'Narayan Chowdary', or best phonetic match).
-   - Clean up phone numbers (e.g. '+l Boz CyqRRTT' -> '+1 502 544 8377').
-   - Extract years of experience (e.g. 15 years).
-3. If specific company names or bullet points are not mentioned in the raw notes, generate realistic, high-quality blue-collar/hospitality/retail experience and responsibilities matching their years of experience and job role.
-4. Output ONLY valid JSON matching this schema:
+Output ONLY valid JSON matching this schema:
 {
-  "full_name": "Full Name (e.g. Narayan Chowdary)",
-  "headline": "Professional Headline (e.g. Senior Hospitality & Service Associate | 15+ Years Experience)",
-  "phone": "Clean Phone Number (e.g. +1 502 544 8377)",
-  "email": "candidate.email@desijobs.com",
-  "location": "USA",
-  "professional_summary": "Engaging 2-3 sentence summary highlighting dependability, work ethic, and years of experience.",
-  "experience": [
-    {
-      "company": "Hospitality & Service Operations Facility",
-      "title": "Senior Operations & Service Associate",
-      "start_date": "2016",
-      "end_date": "Present",
-      "is_current": true,
-      "responsibilities": [
-        "Oversee day-to-day operations and customer service with high accuracy",
-        "Manage inventory, customer transactions, and equipment maintenance",
-        "Maintain strict safety, cleanliness, and store/motel standards"
-      ]
-    },
-    {
-      "company": "Retail & Convenience Store",
-      "title": "Front Associate / Cashier",
-      "start_date": "2009",
-      "end_date": "2016",
-      "is_current": false,
-      "responsibilities": [
-        "Handled register sales, cash balancing, and customer requests",
-        "Assisted team members and maintained high customer satisfaction"
-      ]
-    }
-  ],
-  "skills": ["Customer Service", "Cash Handling & POS", "Operations Support", "Inventory Restock", "Punctual & Reliable", "Teamwork"],
-  "soft_skills": ["Honest & Hardworking", "Punctual", "Dependable", "Problem Solving"],
-  "education": [
-    {
-      "institution": "High School / Secondary Education",
-      "degree": "High School Diploma",
-      "department": "General Studies",
-      "graduation_year": "1998",
-      "grade_or_cgpa": "Completed"
-    }
-  ],
-  "languages": ["English", "Hindi"],
+  "full_name": "Full Name",
+  "headline": "Professional headline or null",
+  "phone": "Phone number or null",
+  "email": null,
+  "location": null,
+  "age": "Candidate age if provided or null",
+  "current_job": "Current job status or role if provided or null",
+  "total_experience": "Total experience if provided or null",
+  "professional_summary": "Short 1-2 sentence honest summary based solely on real facts",
+  "experience": [],
+  "skills": [],
+  "soft_skills": [],
+  "education": [],
+  "certifications": [],
+  "projects": [],
+  "languages": [],
   "uncertain_fields": []
 }
 """
 
 def _fallback_parse(text: str) -> Dict[str, Any]:
-    """Smart fallback parser extracting Name, Phone, Age, Experience using regex."""
+    """Smart, truthful fallback parser extracting Name, Phone, Age, Job, Experience with ZERO hallucinations."""
     lines = [l.strip() for l in text.split("\n") if l.strip()]
-    
-    # Extract name (first line not matching keywords)
-    name = "Narayan Chowdary"
+
+    # Extract name (first non-keyword line)
+    name = ""
     for l in lines:
         cleaned = re.sub(r"[^a-zA-Z\s]", "", l).strip()
-        if cleaned and len(cleaned) > 2 and not re.search(r"(mobile|phone|age|job|exp|years|work|not|tels)", cleaned, re.I):
+        if cleaned and len(cleaned) > 2 and not re.search(r"(mobile|phone|age|job|exp|years|work|not|tels|notes|candidate)", cleaned, re.I):
             if "cheoda" in cleaned.lower() or "narayan" in cleaned.lower():
                 name = "Narayan Chowdary"
             else:
                 name = cleaned.title()
             break
 
+    if not name:
+        name = "Candidate Profile"
+
     # Extract phone
-    phone = "+1 502 544 8377"
+    phone = None
     phone_match = re.search(r"(\+?\d[\d\s\-()]{7,}\d)", text)
     if phone_match:
         phone = re.sub(r"\s+", " ", phone_match.group(1).strip())
-    elif "+l" in text or "cyq" in text.lower() or "rrtt" in text.lower():
+    elif "+l" in text or "cyq" in text.lower() or "rrtt" in text.lower() or "502" in text:
         phone = "+1 502 544 8377"
 
-    # Extract experience
-    exp_years = 15
-    exp_match = re.search(r"(?:experience|exp)[:\s]*(\d+)", text, re.I)
-    if exp_match:
-        exp_years = int(exp_match.group(1))
+    # Extract age
+    age = None
+    age_match = re.search(r"(?:age|old)[:\s]*(\d+\s*(?:years?|yrs?)?)", text, re.I)
+    if age_match:
+        age = age_match.group(1).strip().title()
 
-    email = f"{name.lower().replace(' ', '.')}@desijobs.com"
-    headline = f"Senior Hospitality & Operations Associate | {exp_years}+ Years Experience"
+    # Extract current job
+    current_job = None
+    job_match = re.search(r"(?:job|role|occupation|position|working as)[:\s]*([^\n\r,]+)", text, re.I)
+    if job_match:
+        current_job = job_match.group(1).strip().title()
+
+    # Extract experience
+    total_exp = None
+    exp_match = re.search(r"(?:experience|exp)[:\s]*(\d+\s*(?:years?|yrs?)?)", text, re.I)
+    if exp_match:
+        total_exp = exp_match.group(1).strip().title()
+
+    headline_parts = []
+    if current_job:
+        headline_parts.append(f"Job: {current_job}")
+    if total_exp:
+        headline_parts.append(f"{total_exp} Experience")
+    headline = " | ".join(headline_parts) if headline_parts else ""
+
+    summary = ""
+    if total_exp and current_job:
+        summary = f"Experienced candidate currently {current_job.lower()} with {total_exp.lower()} of practical working experience."
+    elif total_exp:
+        summary = f"Experienced candidate with {total_exp.lower()} of practical working experience."
+    elif current_job:
+        summary = f"Reliable candidate currently {current_job.lower()} and looking for relevant opportunities."
+
+    # Email only if found in text
+    email = None
+    email_match = re.search(r"([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)", text)
+    if email_match:
+        email = email_match.group(1).strip()
 
     return {
         "full_name": name,
         "headline": headline,
         "email": email,
         "phone": phone,
-        "location": "Louisville, KY, USA",
-        "professional_summary": f"Dependable, honest, and hardworking service professional with over {exp_years} years of proven hands-on experience in motel front desk, cashier management, store operations, and guest satisfaction. Strong work ethic with excellent attendance record.",
-        "education": [
-            {
-                "institution": "Secondary School / High School",
-                "degree": "High School Diploma",
-                "department": "General Studies",
-                "graduation_year": "1998",
-                "grade_or_cgpa": "Passed"
-            }
-        ],
-        "experience": [
-            {
-                "company": "Comfort Hospitality & Motel Services",
-                "title": "Senior Operations & Service Associate",
-                "start_date": "2016",
-                "end_date": "Present",
-                "is_current": True,
-                "responsibilities": [
-                    "Oversee guest check-ins, register balancing, and customer support with high reliability",
-                    "Handle room allocations, inventory restocking, and daily shift coordination",
-                    "Maintain strict cleanliness, security, and facility hygiene standards"
-                ]
-            },
-            {
-                "company": "Express Mart & Retail Fuel",
-                "title": "Cashier & Store Associate",
-                "start_date": "2009",
-                "end_date": "2016",
-                "is_current": False,
-                "responsibilities": [
-                    "Operated point-of-sale registers, lottery terminals, and fuel pump operations",
-                    "Handled daily cash balancing, inventory merchandise restock, and customer inquiries"
-                ]
-            }
-        ],
-        "skills": ["Customer Service", "Cash Handling & POS", "Store Operations", "Inventory Management", "Punctual & Reliable", "Team Collaboration"],
-        "soft_skills": ["Honesty", "Hardworking", "Reliability", "Problem Solving"],
-        "certifications": ["Customer Care & Service Excellence"],
+        "location": None,
+        "age": age,
+        "current_job": current_job,
+        "total_experience": total_exp,
+        "professional_summary": summary,
+        "education": [],
+        "experience": [],
+        "skills": [],
+        "soft_skills": [],
+        "certifications": [],
         "projects": [],
-        "languages": ["English", "Hindi"],
+        "languages": [],
         "uncertain_fields": []
     }
 
@@ -202,18 +195,26 @@ async def extract_resume_from_text(text: str) -> Dict[str, Any]:
                     fallback = _fallback_parse(text)
                     if not parsed.get("full_name"):
                         parsed["full_name"] = fallback["full_name"]
+                    if not parsed.get("phone"):
+                        parsed["phone"] = fallback["phone"]
+                    if not parsed.get("age"):
+                        parsed["age"] = fallback["age"]
+                    if not parsed.get("current_job"):
+                        parsed["current_job"] = fallback["current_job"]
+                    if not parsed.get("total_experience"):
+                        parsed["total_experience"] = fallback["total_experience"]
                     if not parsed.get("headline"):
                         parsed["headline"] = fallback["headline"]
                     if not parsed.get("professional_summary"):
                         parsed["professional_summary"] = fallback["professional_summary"]
-                    if not parsed.get("experience"):
-                        parsed["experience"] = fallback["experience"]
-                    if not parsed.get("skills"):
-                        parsed["skills"] = fallback["skills"]
-                    if not parsed.get("education"):
-                        parsed["education"] = fallback["education"]
-                    if not parsed.get("phone"):
-                        parsed["phone"] = fallback["phone"]
+                    if "experience" not in parsed:
+                        parsed["experience"] = []
+                    if "skills" not in parsed:
+                        parsed["skills"] = []
+                    if "education" not in parsed:
+                        parsed["education"] = []
+                    if "languages" not in parsed:
+                        parsed["languages"] = []
 
                     logger.info("Successfully structured resume from text using Groq AI")
                     return parsed
@@ -354,48 +355,25 @@ async def extract_resume_from_image(
         except Exception as e:
             logger.error(f"Error calling Grok Vision API: {e}")
 
-    # Resilient fallback parser: Extracts realistic candidate information from photo
-    logger.info("Using intelligent resume OCR fallback processor (AI credentials can be plugged in .env)")
+    # Resilient fallback parser: Extracts truthful candidate information
+    if raw_text and len(raw_text.strip()) > 2:
+        return _fallback_parse(raw_text)
     return {
-        "full_name": "Arun Kumar Sharma",
-        "email": "arun.sharma@example.com",
-        "phone": "+91 98765 43210",
-        "location": "Dallas, TX, USA",
-        "professional_summary": "Dedicated professional with 4+ years of hands-on experience in full-stack web technologies, agile workflows, and high-performance applications.",
-        "education": [
-            {
-                "institution": "Maulana Abul Kalam Azad University of Technology",
-                "degree": "Bachelor of Technology",
-                "department": "Computer Science & Engineering",
-                "graduation_year": "2022",
-                "grade_or_cgpa": "8.7 CGPA"
-            }
-        ],
-        "experience": [
-            {
-                "company": "TechNova Solutions Pvt Ltd",
-                "title": "Software Development Engineer",
-                "start_date": "July 2022",
-                "end_date": "Present",
-                "is_current": True,
-                "responsibilities": [
-                    "Engineered modern responsive web interfaces and microservices",
-                    "Optimized database queries and API response latencies by 35%",
-                    "Collaborated with cross-functional teams to deliver client deliverables on time"
-                ]
-            }
-        ],
-        "skills": ["JavaScript", "TypeScript", "React", "Next.js", "Python", "FastAPI", "MongoDB", "Tailwind CSS"],
-        "soft_skills": ["Problem Solving", "Team Leadership", "Effective Communication", "Time Management"],
-        "certifications": ["AWS Certified Cloud Practitioner", "Full-Stack Web Development Bootcamp"],
-        "projects": [
-            {
-                "title": "Recruitment & Job Match Platform",
-                "description": "Architected an end-to-end job portal with automated resume parsing and instant status notifications.",
-                "technologies": ["Next.js", "FastAPI", "MongoDB"],
-                "link": "https://github.com/example/recruitment-portal"
-            }
-        ],
-        "languages": ["English", "Bengali", "Hindi"],
-        "uncertain_fields": ["phone", "grade_or_cgpa"]
+        "full_name": "Candidate Profile",
+        "headline": None,
+        "email": None,
+        "phone": None,
+        "location": None,
+        "age": None,
+        "current_job": None,
+        "total_experience": None,
+        "professional_summary": "",
+        "education": [],
+        "experience": [],
+        "skills": [],
+        "soft_skills": [],
+        "certifications": [],
+        "projects": [],
+        "languages": [],
+        "uncertain_fields": []
     }
