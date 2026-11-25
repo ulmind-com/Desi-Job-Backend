@@ -173,12 +173,20 @@ def generate_resume_pdf(resume_data: Dict[str, Any], resume_id: str = None) -> s
     
     # 5. Skills
     skills = resume_data.get("skills", [])
+    skill_items = resume_data.get("skill_items", [])
     soft_skills = resume_data.get("soft_skills", [])
-    if skills or soft_skills:
+    if skill_items or skills or soft_skills:
         story.append(Paragraph("Skills & Competencies", heading_style))
         story.append(HRFlowable(width="100%", thickness=0.5, color=HexColor("#CBD5E1"), spaceBefore=1, spaceAfter=6))
-        if skills:
-            story.append(Paragraph(f"<b>Technical Skills:</b> {', '.join(skills)}", body_style))
+        if skill_items:
+            formatted_skills = [
+                f"{s.get('name')} ({s.get('level')})" if s.get("level") else s.get("name", "")
+                for s in skill_items if s.get("name")
+            ]
+            if formatted_skills:
+                story.append(Paragraph(f"<b>Skills:</b> {', '.join(formatted_skills)}", body_style))
+        elif skills:
+            story.append(Paragraph(f"<b>Skills:</b> {', '.join(skills)}", body_style))
         if soft_skills:
             story.append(Paragraph(f"<b>Core Competencies:</b> {', '.join(soft_skills)}", body_style))
         story.append(Spacer(1, 6))

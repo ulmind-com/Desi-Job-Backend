@@ -23,9 +23,20 @@ class ProjectItem(BaseModel):
     technologies: List[str] = []
     link: Optional[str] = None
 
+class SkillItem(BaseModel):
+    name: str
+    level: Optional[str] = None
+
+class CustomSectionItem(BaseModel):
+    title: str
+    content: str
+
 class ResumeStructuredData(BaseModel):
     full_name: str
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     headline: Optional[str] = None
+    photo_url: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
     location: Optional[str] = None
@@ -37,10 +48,16 @@ class ResumeStructuredData(BaseModel):
     education: List[EducationItem] = []
     experience: List[ExperienceItem] = []
     skills: List[str] = []
+    skill_items: List[SkillItem] = []
     soft_skills: List[str] = []
     certifications: List[str] = []
+    courses: List[str] = []
+    hobbies: List[str] = []
     projects: List[ProjectItem] = []
     languages: List[str] = []
+    show_references: Optional[bool] = None
+    references_text: Optional[str] = None
+    custom_sections: List[CustomSectionItem] = []
     uncertain_fields: List[str] = []
 
 class ResumeCreate(BaseModel):
