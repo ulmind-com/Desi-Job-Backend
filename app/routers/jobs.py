@@ -3,12 +3,30 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Query, Depends
+from pydantic import BaseModel
 from app.schemas.job import JobCreate, JobUpdate, JobOut, JobListResponse
 from app.core.security import get_current_user_payload, require_auth
 from app.services.seed_service import store
+from app.services.grok_service import analyze_duplicate_job
 from app.routers.locations import resolve_us_state
 
 router = APIRouter(prefix="/jobs", tags=["Jobs"])
+
+
+class JobDuplicateCheckRequest(BaseModel):
+    title: str = ""
+    company: str = ""
+    category: Optional[str] = None
+    location: Optional[str] = None
+    city: Optional[str] = None
+    employment_type: Optional[str] = None
+    description: Optional[str] = None
+
+
+@router.post("/check-duplicate")
+async def check_duplicate_job(req: JobDuplicateCheckRequest):
+    """AI-powered check to warn before a duplicate job is submitted."""
+    return await analyze_duplicate_job(req.model_dump(), list(store.jobs.values()))
 
 @router.get("", response_model=JobListResponse)
 async def list_jobs(
@@ -122,6 +140,18 @@ async def get_job_details(job_id: str):
 
 @router.post("", response_model=JobOut)
 async def create_job(req: JobCreate, user: dict = Depends(require_auth)):
+    dup = await analyze_duplicate_job(req.model_dump(), list(store.jobs.values()))
+    if dup.get("is_duplicate"):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "This job has already been posted.",
+                "reason": dup.get("reason"),
+                "confidence": dup.get("confidence"),
+                "matched_job": dup.get("matched_job"),
+            },
+        )
+
     user_id = user.get("sub")
     user_data = store.users.get(user_id, {})
     

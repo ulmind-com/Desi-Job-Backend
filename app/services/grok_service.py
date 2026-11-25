@@ -3,7 +3,7 @@ import base64
 import json
 import logging
 import httpx
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional
 from app.core.config import settings
 
 import re
@@ -376,4 +376,213 @@ async def extract_resume_from_image(
         "projects": [],
         "languages": [],
         "uncertain_fields": []
+    }
+
+
+def _norm_text(val: Optional[str]) -> str:
+    return re.sub(r"[^a-z0-9\s]", " ", (val or "").lower()).strip()
+
+
+def _extract_json_block(raw: str) -> Optional[Dict[str, Any]]:
+    cleaned = re.sub(r"<think>.*?</think>", "", raw or "", flags=re.DOTALL).strip()
+    cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", cleaned, flags=re.MULTILINE).strip()
+    try:
+        return json.loads(cleaned)
+    except Exception:
+        m = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
+        if m:
+            try:
+                return json.loads(m.group(0))
+            except Exception:
+                return None
+    return None
+
+
+async def analyze_duplicate_job(
+    candidate: Dict[str, Any],
+    existing_jobs: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """
+    Uses deterministic pre-matching + Groq AI semantic analysis to detect whether
+    an incoming job post is a duplicate of an already-posted job.
+    """
+    from difflib import SequenceMatcher
+
+    cand_title = _norm_text(candidate.get("title"))
+    cand_company = _norm_text(candidate.get("company"))
+    cand_city = _norm_text(candidate.get("city"))
+    cand_loc = _norm_text(candidate.get("location"))
+    cand_cat = _norm_text(candidate.get("category"))
+    cand_desc = _norm_text(candidate.get("description"))
+
+    active_existing = [
+        j for j in existing_jobs
+        if j.get("status") != "closed" and j.get("moderation_status") != "rejected"
+    ]
+    if not active_existing or not cand_title:
+        return {
+            "is_duplicate": False,
+            "confidence": 0,
+            "matched_job": None,
+            "reason": "No existing matching job found.",
+            "message": "Unique job posting.",
+        }
+
+    # Score candidate against existing jobs to find top closest matches
+    scored: List[tuple[float, Dict[str, Any]]] = []
+    for j in active_existing:
+        ex_title = _norm_text(j.get("title"))
+        ex_company = _norm_text(j.get("company"))
+        ex_city = _norm_text(j.get("city"))
+        ex_loc = _norm_text(j.get("location"))
+        ex_cat = _norm_text(j.get("category"))
+        ex_desc = _norm_text(j.get("description"))
+
+        title_sim = SequenceMatcher(None, cand_title, ex_title).ratio()
+        company_sim = SequenceMatcher(None, cand_company, ex_company).ratio() if (cand_company and ex_company) else 0.0
+        same_city = bool(cand_city and (cand_city in ex_loc or cand_city == ex_city))
+        same_loc = bool(cand_loc and ex_loc and (cand_loc == ex_loc or cand_loc in ex_loc or ex_loc in cand_loc))
+        loc_bonus = 0.2 if (same_city or same_loc) else 0.0
+        cat_bonus = 0.1 if (cand_cat and ex_cat and cand_cat == ex_cat) else 0.0
+        desc_sim = SequenceMatcher(None, cand_desc[:240], ex_desc[:240]).ratio() if (cand_desc and ex_desc) else 0.0
+
+        score = (title_sim * 0.5) + (company_sim * 0.35) + loc_bonus + cat_bonus + (desc_sim * 0.15)
+        scored.append((score, j))
+
+        # Guaranteed instant match for exact same company + title + city/location
+        if title_sim >= 0.90 and company_sim >= 0.85 and (same_city or same_loc or not cand_loc):
+            return {
+                "is_duplicate": True,
+                "confidence": 99,
+                "matched_job": {
+                    "id": j.get("id"),
+                    "title": j.get("title"),
+                    "company": j.get("company"),
+                    "location": j.get("location"),
+                    "category": j.get("category"),
+                    "created_at": str(j.get("created_at") or ""),
+                },
+                "reason": f"Exact match with an existing posting: '{j.get('title')}' at '{j.get('company')}' ({j.get('location')}).",
+                "message": "This job has already been posted.",
+            }
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    top_candidates = [item[1] for item in scored[:12]]
+    top_score, top_job = scored[0]
+
+    # Ask Groq AI to evaluate semantic equivalence against the closest existing listings
+    groq_key = getattr(settings, "GROQ_API_KEY", "") or os.getenv("GROQ_API_KEY", "")
+    if groq_key and top_candidates:
+        try:
+            compact_existing = [
+                {
+                    "id": j.get("id"),
+                    "title": j.get("title"),
+                    "company": j.get("company"),
+                    "category": j.get("category"),
+                    "location": j.get("location"),
+                    "employment_type": j.get("employment_type"),
+                    "description": (j.get("description") or "")[:240],
+                }
+                for j in top_candidates
+            ]
+            incoming_summary = {
+                "title": candidate.get("title"),
+                "company": candidate.get("company"),
+                "category": candidate.get("category"),
+                "location": candidate.get("location"),
+                "employment_type": candidate.get("employment_type"),
+                "description": (candidate.get("description") or "")[:240],
+            }
+
+            system_prompt = (
+                "You are an AI duplicate-job detector for Desi Jobs. "
+                "Determine whether the NEW job posting is essentially the SAME job opening as any EXISTING job posting. "
+                "Mark is_duplicate=true if it represents the same role at the same company/business and same city/area "
+                "(even if the title is worded slightly differently, e.g. 'Motel Front Desk Clerk' vs 'Front Desk & Night Auditor' at the same hotel in the same city, or minor typos/rewording). "
+                "Mark is_duplicate=false if it is a genuinely different city, different employer/store, or clearly different role. "
+                "Output ONLY a valid JSON object with keys: "
+                "is_duplicate (boolean), confidence (integer 0-100), matched_job_id (string or null), reason (short clear sentence)."
+            )
+
+            headers = {
+                "Authorization": f"Bearer {groq_key}",
+                "Content-Type": "application/json",
+                "User-Agent": "Mozilla/5.0",
+            }
+            payload = {
+                "model": getattr(settings, "GROQ_MODEL", "qwen/qwen3.8-27b"),
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {
+                        "role": "user",
+                        "content": json.dumps(
+                            {"new_job": incoming_summary, "existing_jobs": compact_existing},
+                            ensure_ascii=False,
+                        ),
+                    },
+                ],
+                "temperature": 0.1,
+            }
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                resp = await client.post(
+                    getattr(settings, "GROQ_API_URL", "https://api.groq.com/openai/v1/chat/completions"),
+                    headers=headers,
+                    json=payload,
+                )
+                if resp.status_code == 200:
+                    raw_msg = resp.json()["choices"][0]["message"]["content"]
+                    parsed = _extract_json_block(raw_msg)
+                    if isinstance(parsed, dict) and "is_duplicate" in parsed:
+                        is_dup = bool(parsed.get("is_duplicate"))
+                        matched_id = parsed.get("matched_job_id")
+                        matched = next((j for j in top_candidates if j.get("id") == matched_id), top_job if is_dup else None)
+                        return {
+                            "is_duplicate": is_dup,
+                            "confidence": int(parsed.get("confidence", 90 if is_dup else 10)),
+                            "matched_job": (
+                                {
+                                    "id": matched.get("id"),
+                                    "title": matched.get("title"),
+                                    "company": matched.get("company"),
+                                    "location": matched.get("location"),
+                                    "category": matched.get("category"),
+                                    "created_at": str(matched.get("created_at") or ""),
+                                }
+                                if (is_dup and matched)
+                                else None
+                            ),
+                            "reason": parsed.get("reason") or (
+                                f"Matches existing listing '{matched.get('title')}' at '{matched.get('company')}'."
+                                if (is_dup and matched)
+                                else "AI verified this as a unique job opening."
+                            ),
+                            "message": "This job has already been posted." if is_dup else "Unique job posting.",
+                        }
+        except Exception as e:
+            logger.warning(f"AI duplicate check fallback used: {e}")
+
+    # Deterministic fallback if Groq API is unreachable
+    fallback_dup = top_score >= 0.85
+    return {
+        "is_duplicate": fallback_dup,
+        "confidence": int(min(98, round(top_score * 100))),
+        "matched_job": (
+            {
+                "id": top_job.get("id"),
+                "title": top_job.get("title"),
+                "company": top_job.get("company"),
+                "location": top_job.get("location"),
+                "category": top_job.get("category"),
+                "created_at": str(top_job.get("created_at") or ""),
+            }
+            if fallback_dup
+            else None
+        ),
+        "reason": (
+            f"Closely matches existing job '{top_job.get('title')}' at '{top_job.get('company')}' ({top_job.get('location')})."
+            if fallback_dup
+            else "No duplicate job detected."
+        ),
+        "message": "This job has already been posted." if fallback_dup else "Unique job posting.",
     }

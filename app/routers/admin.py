@@ -403,7 +403,21 @@ async def moderate_job(
 
 @router.post("/jobs")
 async def admin_create_job(req: JobCreate, admin: dict = Depends(require_admin)):
-    """Allows Super Admin to directly create and auto-approve job postings."""
+    """Allows Super Admin to directly create and auto-approve job postings (with AI duplicate check)."""
+    from app.services.grok_service import analyze_duplicate_job
+
+    dup = await analyze_duplicate_job(req.model_dump(), list(store.jobs.values()))
+    if dup.get("is_duplicate"):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "This job has already been posted.",
+                "reason": dup.get("reason"),
+                "confidence": dup.get("confidence"),
+                "matched_job": dup.get("matched_job"),
+            },
+        )
+
     job_id = f"job_{uuid.uuid4().hex[:10]}"
     now = datetime.now(timezone.utc)
 
