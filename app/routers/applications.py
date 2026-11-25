@@ -36,6 +36,24 @@ async def submit_application(req: ApplicationCreate, user: dict = Depends(requir
         resume_snapshot = store.resumes[resume_id]["data"]
     elif req.custom_resume_data:
         resume_snapshot = req.custom_resume_data
+        # Ensure submitted resume is also recorded in store.resumes if user has none saved there yet
+        if not resume_id or resume_id not in store.resumes:
+            new_res_id = f"res_{uuid.uuid4().hex[:10]}"
+            snap_name = (resume_snapshot.get("full_name") or req.full_name or "Candidate").strip()
+            now_res = datetime.now(timezone.utc)
+            store.resumes[new_res_id] = {
+                "id": new_res_id,
+                "user_id": user_id,
+                "title": f"{snap_name} — Application Resume",
+                "data": resume_snapshot,
+                "is_default": not any(r.get("user_id") == user_id for r in store.resumes.values()),
+                "source_type": "manual",
+                "source_image_url": None,
+                "pdf_download_url": f"/api/v1/resumes/{new_res_id}/download-pdf",
+                "created_at": now_res,
+                "updated_at": now_res,
+            }
+            resume_id = new_res_id
 
     app_id = f"app_{uuid.uuid4().hex[:10]}"
     now = datetime.now(timezone.utc)

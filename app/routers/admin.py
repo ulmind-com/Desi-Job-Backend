@@ -1,10 +1,10 @@
 import uuid
 from datetime import datetime, timezone, timedelta
-from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends, Query
+from typing import Any, Dict, List, Optional
+from fastapi import APIRouter, Body, HTTPException, Depends, Query
 from app.core.security import require_admin
 from app.services.seed_service import store
-from app.schemas.job import JobCreate
+from app.schemas.job import JobCreate, JobUpdate
 
 router = APIRouter(prefix="/admin", tags=["Super Admin Panel"])
 
@@ -349,6 +349,62 @@ async def update_user_status(user_id: str, is_active: bool, admin: dict = Depend
     return {"message": "User status updated", "is_active": is_active}
 
 
+@router.patch("/users/{user_id}")
+async def admin_update_user(
+    user_id: str,
+    payload: Dict[str, Any] = Body(...),
+    admin: dict = Depends(require_admin),
+):
+    user = store.users.get(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    allowed = {"name", "email", "phone", "role", "location", "headline", "is_active", "is_verified"}
+    for k, v in payload.items():
+        if k in allowed and v is not None:
+            if k == "role" and user.get("role") in ["admin", "super_admin"]:
+                continue
+            user[k] = v
+    user["updated_at"] = datetime.now(timezone.utc)
+
+    store.audit_logs.append({
+        "id": f"log_{uuid.uuid4().hex[:8]}",
+        "admin_email": admin.get("email"),
+        "action": "USER_UPDATED_ADMIN",
+        "resource_type": "USER",
+        "resource_id": user_id,
+        "details": f"Updated account details for {user.get('email')}",
+        "timestamp": datetime.now(timezone.utc),
+    })
+    store.save_state()
+    safe = user.copy()
+    safe.pop("hashed_password", None)
+    return {"message": "User updated", "user": safe}
+
+
+@router.delete("/users/{user_id}")
+async def admin_delete_user(user_id: str, admin: dict = Depends(require_admin)):
+    user = store.users.get(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.get("role") in ["admin", "super_admin"]:
+        raise HTTPException(status_code=400, detail="Cannot delete Super Admin account")
+
+    email = user.get("email", user_id)
+    del store.users[user_id]
+    store.audit_logs.append({
+        "id": f"log_{uuid.uuid4().hex[:8]}",
+        "admin_email": admin.get("email"),
+        "action": "USER_DELETED_ADMIN",
+        "resource_type": "USER",
+        "resource_id": user_id,
+        "details": f"Deleted user account: {email}",
+        "timestamp": datetime.now(timezone.utc),
+    })
+    store.save_state()
+    return {"message": "User deleted successfully"}
+
+
 @router.get("/jobs")
 async def get_all_jobs_admin(
     moderation_status: Optional[str] = None,
@@ -448,6 +504,56 @@ async def admin_create_job(req: JobCreate, admin: dict = Depends(require_admin))
     return new_job
 
 
+@router.patch("/jobs/{job_id}")
+async def admin_update_job(
+    job_id: str,
+    req: JobUpdate,
+    admin: dict = Depends(require_admin),
+):
+    job = store.jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    update_fields = req.model_dump(exclude_unset=True)
+    for k, v in update_fields.items():
+        if v is not None:
+            job[k] = v
+    job["updated_at"] = datetime.now(timezone.utc)
+
+    store.audit_logs.append({
+        "id": f"log_{uuid.uuid4().hex[:8]}",
+        "admin_email": admin.get("email"),
+        "action": "JOB_UPDATED_ADMIN",
+        "resource_type": "JOB",
+        "resource_id": job_id,
+        "details": f"Updated job: {job.get('title')} at {job.get('company')}",
+        "timestamp": datetime.now(timezone.utc),
+    })
+    store.save_state()
+    return {"message": "Job updated", "job": job}
+
+
+@router.delete("/jobs/{job_id}")
+async def admin_delete_job(job_id: str, admin: dict = Depends(require_admin)):
+    job = store.jobs.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    title = job.get("title", job_id)
+    del store.jobs[job_id]
+    store.audit_logs.append({
+        "id": f"log_{uuid.uuid4().hex[:8]}",
+        "admin_email": admin.get("email"),
+        "action": "JOB_DELETED_ADMIN",
+        "resource_type": "JOB",
+        "resource_id": job_id,
+        "details": f"Deleted job listing: {title}",
+        "timestamp": datetime.now(timezone.utc),
+    })
+    store.save_state()
+    return {"message": "Job deleted successfully"}
+
+
 @router.get("/applications")
 async def get_all_applications_admin(admin: dict = Depends(require_admin)):
     now = datetime.now(timezone.utc)
@@ -509,20 +615,162 @@ async def admin_update_application_status(
     return {"message": "Application status updated", "application": app}
 
 
+@router.patch("/applications/{application_id}")
+async def admin_update_application(
+    application_id: str,
+    payload: Dict[str, Any] = Body(...),
+    admin: dict = Depends(require_admin),
+):
+    app = store.applications.get(application_id)
+    if not app:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    for k in ["full_name", "email", "phone", "status", "cover_letter", "employer_notes"]:
+        if k in payload and payload[k] is not None:
+            app[k] = payload[k]
+    app["updated_at"] = datetime.now(timezone.utc)
+
+    store.audit_logs.append({
+        "id": f"log_{uuid.uuid4().hex[:8]}",
+        "admin_email": admin.get("email"),
+        "action": "APPLICATION_UPDATED_ADMIN",
+        "resource_type": "APPLICATION",
+        "resource_id": application_id,
+        "details": f"Edited application for {app.get('full_name')}",
+        "timestamp": datetime.now(timezone.utc),
+    })
+    store.save_state()
+    return {"message": "Application updated", "application": app}
+
+
+@router.delete("/applications/{application_id}")
+async def admin_delete_application(application_id: str, admin: dict = Depends(require_admin)):
+    app = store.applications.get(application_id)
+    if not app:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    applicant_name = app.get("full_name", application_id)
+    job = store.jobs.get(app.get("job_id", ""))
+    if job and int(job.get("applications_count", 0)) > 0:
+        job["applications_count"] = int(job.get("applications_count", 0)) - 1
+    del store.applications[application_id]
+
+    store.audit_logs.append({
+        "id": f"log_{uuid.uuid4().hex[:8]}",
+        "admin_email": admin.get("email"),
+        "action": "APPLICATION_DELETED_ADMIN",
+        "resource_type": "APPLICATION",
+        "resource_id": application_id,
+        "details": f"Deleted application from {applicant_name}",
+        "timestamp": datetime.now(timezone.utc),
+    })
+    store.save_state()
+    return {"message": "Application deleted successfully"}
+
+
 @router.get("/resumes")
 async def get_all_resumes_admin(admin: dict = Depends(require_admin)):
-    """Returns all real saved resumes from the Resume Builder / user profiles."""
+    """Returns all real saved resumes (from Resume Builder / profile + any unlinked application resume snapshots)."""
     now = datetime.now(timezone.utc)
     items = []
+    seen_ids = set()
+
     for r in store.resumes.values():
+        seen_ids.add(r.get("id"))
         owner = store.users.get(r.get("user_id", ""), {})
+        r_data = r.get("data") or {}
         r_copy = r.copy()
-        r_copy["owner_name"] = owner.get("name") or (r.get("data") or {}).get("full_name") or "Candidate"
-        r_copy["owner_email"] = owner.get("email") or (r.get("data") or {}).get("email") or ""
+        r_copy["owner_name"] = owner.get("name") or r_data.get("full_name") or "Candidate"
+        r_copy["owner_email"] = owner.get("email") or r_data.get("email") or ""
+        r_copy["owner_avatar"] = owner.get("avatar_url") or r_data.get("photo_url")
+        r_copy["location"] = r_data.get("location") or owner.get("location") or "USA"
         items.append(r_copy)
+
+    # Also surface any application resume snapshots not yet stored in store.resumes
+    for a in store.applications.values():
+        snap = a.get("resume_snapshot")
+        rid = a.get("resume_id")
+        if snap and (not rid or rid not in seen_ids):
+            owner = store.users.get(a.get("user_id", ""), {})
+            synth_id = rid or f"app_snap_{a.get('id')}"
+            if synth_id in seen_ids:
+                continue
+            seen_ids.add(synth_id)
+            items.append({
+                "id": synth_id,
+                "user_id": a.get("user_id"),
+                "title": f"{a.get('full_name') or 'Candidate'} — {a.get('job_title') or 'Application'}",
+                "data": snap,
+                "is_default": False,
+                "source_type": "application",
+                "owner_name": owner.get("name") or a.get("full_name") or "Candidate",
+                "owner_email": owner.get("email") or a.get("email") or "",
+                "owner_avatar": owner.get("avatar_url") or (snap.get("photo_url") if isinstance(snap, dict) else None),
+                "location": (snap.get("location") if isinstance(snap, dict) else None) or a.get("job_location") or owner.get("location") or "USA",
+                "created_at": a.get("created_at"),
+                "updated_at": a.get("updated_at"),
+            })
 
     items.sort(key=lambda x: _parse_dt(x.get("created_at")) or now, reverse=True)
     return {"resumes": items, "total": len(items)}
+
+
+@router.patch("/resumes/{resume_id}")
+async def admin_update_resume(
+    resume_id: str,
+    payload: Dict[str, Any] = Body(...),
+    admin: dict = Depends(require_admin),
+):
+    r = store.resumes.get(resume_id)
+    if not r:
+        raise HTTPException(status_code=404, detail="Resume not found")
+
+    if "title" in payload and payload["title"] is not None:
+        r["title"] = payload["title"]
+    if "source_type" in payload and payload["source_type"] is not None:
+        r["source_type"] = payload["source_type"]
+    data = r.setdefault("data", {})
+    for field in ["full_name", "email", "phone", "location", "headline", "professional_summary", "skills"]:
+        if field in payload and payload[field] is not None:
+            data[field] = payload[field]
+    r["updated_at"] = datetime.now(timezone.utc)
+
+    store.audit_logs.append({
+        "id": f"log_{uuid.uuid4().hex[:8]}",
+        "admin_email": admin.get("email"),
+        "action": "RESUME_UPDATED_ADMIN",
+        "resource_type": "RESUME",
+        "resource_id": resume_id,
+        "details": f"Updated resume: {r.get('title')}",
+        "timestamp": datetime.now(timezone.utc),
+    })
+    store.save_state()
+    return {"message": "Resume updated", "resume": r}
+
+
+@router.delete("/resumes/{resume_id}")
+async def admin_delete_resume(resume_id: str, admin: dict = Depends(require_admin)):
+    r = store.resumes.get(resume_id)
+    if not r:
+        raise HTTPException(status_code=404, detail="Resume not found")
+
+    title = r.get("title", resume_id)
+    del store.resumes[resume_id]
+    for u in store.users.values():
+        if u.get("default_resume_id") == resume_id:
+            u["default_resume_id"] = None
+
+    store.audit_logs.append({
+        "id": f"log_{uuid.uuid4().hex[:8]}",
+        "admin_email": admin.get("email"),
+        "action": "RESUME_DELETED_ADMIN",
+        "resource_type": "RESUME",
+        "resource_id": resume_id,
+        "details": f"Deleted resume: {title}",
+        "timestamp": datetime.now(timezone.utc),
+    })
+    store.save_state()
+    return {"message": "Resume deleted successfully"}
 
 
 @router.get("/audit-logs")

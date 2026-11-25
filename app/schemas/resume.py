@@ -3,36 +3,36 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 class EducationItem(BaseModel):
-    institution: str
-    degree: str
+    institution: Optional[str] = ""
+    degree: Optional[str] = ""
     department: Optional[str] = None
     graduation_year: Optional[str] = None
     grade_or_cgpa: Optional[str] = None
 
 class ExperienceItem(BaseModel):
-    company: str
-    title: str
+    company: Optional[str] = ""
+    title: Optional[str] = ""
     start_date: Optional[str] = None
     end_date: Optional[str] = "Present"
     is_current: bool = False
     responsibilities: List[str] = []
 
 class ProjectItem(BaseModel):
-    title: str
-    description: str
+    title: Optional[str] = ""
+    description: Optional[str] = ""
     technologies: List[str] = []
     link: Optional[str] = None
 
 class SkillItem(BaseModel):
-    name: str
+    name: str = ""
     level: Optional[str] = None
 
 class CustomSectionItem(BaseModel):
-    title: str
-    content: str
+    title: str = ""
+    content: str = ""
 
 class ResumeStructuredData(BaseModel):
-    full_name: str
+    full_name: str = ""
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     headline: Optional[str] = None
