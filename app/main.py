@@ -10,7 +10,7 @@ from app.core.database import db_manager
 from app.core.firebase import init_firebase
 from app.routers import (
     auth, users, jobs, applications, resumes,
-    categories, admin, notifications, health, content
+    categories, admin, notifications, health, content, locations
 )
 
 logging.basicConfig(
@@ -73,6 +73,7 @@ app.include_router(categories.router, prefix=api_prefix)
 app.include_router(admin.router, prefix=api_prefix)
 app.include_router(notifications.router, prefix=api_prefix)
 app.include_router(content.router, prefix=api_prefix)
+app.include_router(locations.router, prefix=api_prefix)
 
 @app.get("/")
 async def root():

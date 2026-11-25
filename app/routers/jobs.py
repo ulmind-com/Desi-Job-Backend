@@ -1,3 +1,4 @@
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -5,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Query, Depends
 from app.schemas.job import JobCreate, JobUpdate, JobOut, JobListResponse
 from app.core.security import get_current_user_payload, require_auth
 from app.services.seed_service import store
+from app.routers.locations import resolve_us_state
 
 router = APIRouter(prefix="/jobs", tags=["Jobs"])
 
@@ -13,6 +15,7 @@ async def list_jobs(
     q: Optional[str] = None,
     category: Optional[str] = None,
     country: Optional[str] = None,
+    state: Optional[str] = None,
     city: Optional[str] = None,
     work_mode: Optional[str] = None,
     employment_type: Optional[str] = None,
@@ -22,6 +25,7 @@ async def list_jobs(
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=50)
 ):
+    resolved_state = resolve_us_state(state) if (state and state.lower() != "all") else None
     results = []
     for job in store.jobs.values():
         # Only show active and approved jobs to public
@@ -30,7 +34,7 @@ async def list_jobs(
             
         if q:
             query_lower = q.lower()
-            text_corpus = f"{job['title']} {job['company']} {job['description']} {' '.join(job.get('skills', []))}".lower()
+            text_corpus = f"{job['title']} {job['company']} {job['description']} {job.get('location', '')} {job.get('city', '')} {' '.join(job.get('skills', []))}".lower()
             if query_lower not in text_corpus:
                 continue
                 
@@ -40,6 +44,22 @@ async def list_jobs(
                 
         if country and country.lower() != "all":
             if country.lower() not in job.get("country", "").lower() and country.lower() not in job.get("location", "").lower():
+                continue
+
+        if state and state.lower() != "all":
+            loc_str = job.get("location", "")
+            job_state = job.get("state", "")
+            if resolved_state:
+                code_pat = rf"\b{re.escape(resolved_state['code'])}\b"
+                name_lower = resolved_state["name"].lower()
+                matched = (
+                    re.search(code_pat, loc_str, re.IGNORECASE) is not None
+                    or name_lower in loc_str.lower()
+                    or job_state.lower() in (resolved_state["code"].lower(), name_lower)
+                )
+            else:
+                matched = state.lower() in loc_str.lower() or state.lower() == job_state.lower()
+            if not matched:
                 continue
 
         if city and city.lower() != "all":
