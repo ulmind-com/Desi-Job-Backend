@@ -614,7 +614,7 @@ async def admin_update_application_status(
     })
     store.save_state()
     if app.get("status") != old_status:
-        send_status_update_email(
+        await send_status_update_email(
             applicant_email=app.get("email", ""),
             applicant_name=app.get("full_name", "Candidate"),
             job_title=app.get("job_title", "Position"),

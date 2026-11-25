@@ -15,7 +15,7 @@ async def send_email(
     html: str,
     reply_to: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Send a transactional email via the Resend HTTP API using noreply@hireadesi.com."""
+    """Send a simple transactional email via Resend using noreply@hireadesi.com."""
     api_key = (settings.RESEND_API_KEY or "").strip()
     if not api_key:
         logger.warning("Resend API key is not configured; skipping email to %s", to)
@@ -61,7 +61,6 @@ def trigger_email_background(
     html: str,
     reply_to: Optional[str] = None,
 ) -> None:
-    """Schedule email delivery in the background so user API responses stay fast."""
     try:
         loop = asyncio.get_running_loop()
         loop.create_task(send_email(to=to, subject=subject, html=html, reply_to=reply_to))
@@ -69,39 +68,28 @@ def trigger_email_background(
         pass
 
 
-def _wrap_brand_html(title: str, body_html: str) -> str:
-    return f"""
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background:#f8fafc; padding:24px;">
-      <div style="max-width:560px; margin:0 auto; background:#ffffff; border:1px solid #e2e8f0; border-radius:16px; overflow:hidden;">
-        <div style="background:#17324D; padding:20px 24px; color:#ffffff;">
-          <h1 style="margin:0; font-size:18px; font-weight:800; letter-spacing:-0.2px;">Desi Jobs</h1>
-          <p style="margin:4px 0 0; font-size:12px; color:#cbd5e1;">{title}</p>
-        </div>
-        <div style="padding:24px; color:#334155; font-size:14px; line-height:1.6;">
-          {body_html}
-        </div>
-        <div style="padding:14px 24px; background:#f8fafc; border-top:1px solid #e2e8f0; font-size:11px; color:#64748b;">
-          Sent via Desi Jobs • noreply@hireadesi.com
-        </div>
-      </div>
-    </div>
-    """
+def _simple_html(body_html: str) -> str:
+    return (
+        '<div style="font-family: Arial, sans-serif; color: #1f2937; font-size: 14px; line-height: 1.6;">'
+        f"{body_html}"
+        '<p style="margin-top: 20px; color: #6b7280; font-size: 12px;">— Desi Jobs (hireadesi.com)</p>'
+        "</div>"
+    )
 
 
 def send_welcome_email(email: str, name: str, role: str) -> None:
     role_label = "Employer" if role == "employer" else "Job Seeker"
-    html = _wrap_brand_html(
-        "Welcome to Desi Jobs",
+    html = _simple_html(
         f"""
-        <p>Hi <strong>{name or 'there'}</strong>,</p>
-        <p>Your <strong>{role_label}</strong> account on Desi Jobs is now active.</p>
-        <p>You can sign in anytime to manage your profile, build or scan an AI resume, or apply and hire across the USA.</p>
-        """,
+        <p>Hi {name or 'there'},</p>
+        <p>Welcome to <strong>Desi Jobs</strong>. Your {role_label} account has been created successfully.</p>
+        <p>You can now sign in anytime to apply for jobs, build your resume, or manage listings.</p>
+        """
     )
-    trigger_email_background(email, "Welcome to Desi Jobs!", html)
+    trigger_email_background(email, "Welcome to Desi Jobs", html)
 
 
-def send_application_emails(
+async def send_application_emails(
     applicant_email: str,
     applicant_name: str,
     job_title: str,
@@ -109,39 +97,45 @@ def send_application_emails(
     job_location: str,
     employer_email: Optional[str] = None,
 ) -> None:
+    tasks = []
     if applicant_email:
-        candidate_html = _wrap_brand_html(
-            "Application Received",
+        candidate_html = _simple_html(
             f"""
-            <p>Hi <strong>{applicant_name}</strong>,</p>
-            <p>Your application for <strong>{job_title}</strong> at <strong>{company_name}</strong> ({job_location}) has been submitted.</p>
-            <p>We will notify you by email when the hiring team updates your application status.</p>
-            """,
+            <p>Hi {applicant_name},</p>
+            <p>Your application for <strong>{job_title}</strong> at <strong>{company_name}</strong> ({job_location}) has been received.</p>
+            <p>We will notify you by email when there is an update from the hiring team.</p>
+            """
         )
-        trigger_email_background(
-            applicant_email,
-            f"Application Submitted: {job_title} at {company_name}",
-            candidate_html,
+        tasks.append(
+            send_email(
+                to=applicant_email,
+                subject=f"Application Received: {job_title} at {company_name}",
+                html=candidate_html,
+            )
         )
 
     if employer_email:
-        employer_html = _wrap_brand_html(
-            "New Candidate Application",
+        employer_html = _simple_html(
             f"""
             <p>Hello,</p>
-            <p><strong>{applicant_name}</strong> ({applicant_email}) just applied for your opening <strong>{job_title}</strong> in {job_location}.</p>
-            <p>Log in to Desi Jobs to inspect their AI resume and update their hiring stage.</p>
-            """,
+            <p><strong>{applicant_name}</strong> ({applicant_email}) applied for your job posting <strong>{job_title}</strong> ({job_location}).</p>
+            <p>Sign in to Desi Jobs to view their details and resume.</p>
+            """
         )
-        trigger_email_background(
-            employer_email,
-            f"New Applicant: {applicant_name} for {job_title}",
-            employer_html,
-            reply_to=applicant_email or None,
+        tasks.append(
+            send_email(
+                to=employer_email,
+                subject=f"New Application: {applicant_name} for {job_title}",
+                html=employer_html,
+                reply_to=applicant_email or None,
+            )
         )
 
+    if tasks:
+        await asyncio.gather(*tasks, return_exceptions=True)
 
-def send_status_update_email(
+
+async def send_status_update_email(
     applicant_email: str,
     applicant_name: str,
     job_title: str,
@@ -149,16 +143,15 @@ def send_status_update_email(
 ) -> None:
     if not applicant_email:
         return
-    html = _wrap_brand_html(
-        "Application Status Updated",
+    html = _simple_html(
         f"""
-        <p>Hi <strong>{applicant_name}</strong>,</p>
-        <p>Your application status for <strong>{job_title}</strong> has been updated to: <strong>{new_status}</strong>.</p>
-        <p>Visit your Desi Jobs dashboard for full details.</p>
-        """,
+        <p>Hi {applicant_name},</p>
+        <p>Your application for <strong>{job_title}</strong> has been updated to: <strong>{new_status}</strong>.</p>
+        <p>Check your Desi Jobs dashboard for more details.</p>
+        """
     )
-    trigger_email_background(
-        applicant_email,
-        f"Status Update ({new_status}): {job_title}",
-        html,
+    await send_email(
+        to=applicant_email,
+        subject=f"Application Status Update: {job_title} ({new_status})",
+        html=html,
     )

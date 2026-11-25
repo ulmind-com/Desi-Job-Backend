@@ -97,7 +97,7 @@ async def submit_application(req: ApplicationCreate, user: dict = Depends(requir
         
     store.save_state()
     employer_email = store.users.get(employer_id, {}).get("email") if employer_id else None
-    send_application_emails(
+    await send_application_emails(
         applicant_email=req.email,
         applicant_name=req.full_name,
         job_title=job["title"],
@@ -182,7 +182,7 @@ async def update_application_status(
     }
 
     store.save_state()
-    send_status_update_email(
+    await send_status_update_email(
         applicant_email=app.get("email", ""),
         applicant_name=app.get("full_name", "Candidate"),
         job_title=app.get("job_title", "Position"),
