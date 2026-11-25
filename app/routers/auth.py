@@ -124,7 +124,7 @@ async def verify_token(req: FirebaseVerifyRequest):
             "phone": req.phone or "",
             "hashed_password": "",
             "role": req.role if req.role in ["job_seeker", "employer"] else "job_seeker",
-            "avatar_url": claims.get("picture"),
+            "avatar_url": req.avatar_url or claims.get("picture"),
             "location": "Not specified",
             "headline": "Job Seeker",
             "about": "",

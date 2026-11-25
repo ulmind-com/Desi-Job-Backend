@@ -18,6 +18,7 @@ class FirebaseVerifyRequest(BaseModel):
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     role: Optional[str] = "job_seeker"
+    avatar_url: Optional[str] = None
 
 class TokenResponse(BaseModel):
     access_token: str
