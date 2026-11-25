@@ -10,7 +10,7 @@ from app.core.database import db_manager
 from app.core.firebase import init_firebase
 from app.routers import (
     auth, users, jobs, applications, resumes,
-    categories, admin, notifications, health, content, locations
+    categories, admin, notifications, health, content, locations, analytics
 )
 
 logging.basicConfig(
@@ -30,6 +30,8 @@ async def lifespan(app: FastAPI):
     
     # Connect MongoDB
     await db_manager.connect()
+    from app.services.seed_service import store
+    await store.load_from_mongo()
     
     yield
     
@@ -74,6 +76,7 @@ app.include_router(admin.router, prefix=api_prefix)
 app.include_router(notifications.router, prefix=api_prefix)
 app.include_router(content.router, prefix=api_prefix)
 app.include_router(locations.router, prefix=api_prefix)
+app.include_router(analytics.router, prefix=api_prefix)
 
 @app.get("/")
 async def root():

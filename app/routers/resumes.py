@@ -103,6 +103,7 @@ async def save_resume(req: ResumeCreate, user: dict = Depends(require_auth)):
             user_obj["default_resume_id"] = resume_id
 
     store.resumes[resume_id] = resume_obj
+    store.save_state()
     return resume_obj
 
 @router.get("/my-resumes")
@@ -134,6 +135,7 @@ async def set_default_resume(resume_id: str, user: dict = Depends(require_auth))
     if user_obj:
         user_obj["default_resume_id"] = resume_id
 
+    store.save_state()
     return {"message": "Default resume updated successfully"}
 
 @router.get("/{resume_id}/download-pdf")

@@ -76,6 +76,7 @@ async def submit_application(req: ApplicationCreate, user: dict = Depends(requir
             "created_at": now
         }
         
+    store.save_state()
     return application
 
 @router.get("/my-applications", response_model=ApplicationListResponse)
@@ -114,6 +115,7 @@ async def get_applications_for_job(job_id: str, user: dict = Depends(require_aut
         
     apps = [a for a in store.applications.values() if a["job_id"] == job_id]
     apps.sort(key=lambda x: x["created_at"], reverse=True)
+    store.save_state()
     return apps
 
 @router.patch("/{application_id}/status")
@@ -151,6 +153,7 @@ async def update_application_status(
         "created_at": now
     }
 
+    store.save_state()
     return app
 
 @router.post("/{application_id}/withdraw")
@@ -165,4 +168,5 @@ async def withdraw_application(application_id: str, user: dict = Depends(require
         
     app["status"] = "Withdrawn"
     app["updated_at"] = datetime.now(timezone.utc)
+    store.save_state()
     return {"message": "Application withdrawn successfully"}

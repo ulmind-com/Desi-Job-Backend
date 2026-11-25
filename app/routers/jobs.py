@@ -117,6 +117,7 @@ async def get_job_details(job_id: str):
     if not job:
         raise HTTPException(status_code=404, detail="Job position not found")
     job["views_count"] = job.get("views_count", 0) + 1
+    store.save_state()
     return job
 
 @router.post("", response_model=JobOut)
@@ -141,6 +142,7 @@ async def create_job(req: JobCreate, user: dict = Depends(require_auth)):
     })
     
     store.jobs[job_id] = new_job
+    store.save_state()
     return new_job
 
 @router.patch("/{job_id}")
@@ -160,6 +162,7 @@ async def update_job(job_id: str, req: JobUpdate, user: dict = Depends(require_a
         if v is not None:
             job[k] = v
     job["updated_at"] = datetime.now(timezone.utc)
+    store.save_state()
     return job
 
 @router.delete("/{job_id}")
@@ -175,4 +178,5 @@ async def delete_job(job_id: str, user: dict = Depends(require_auth)):
         raise HTTPException(status_code=403, detail="You do not have permission to delete this job")
 
     del store.jobs[job_id]
+    store.save_state()
     return {"message": "Job deleted successfully"}

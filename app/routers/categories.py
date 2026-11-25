@@ -39,6 +39,7 @@ async def create_category(req: CategoryCreate, admin: dict = Depends(require_adm
         "updated_at": now
     }
     store.categories[cat_id] = new_cat
+    store.save_state()
     return new_cat
 
 @router.patch("/{category_id}")
@@ -52,6 +53,7 @@ async def update_category(category_id: str, req: CategoryUpdate, admin: dict = D
         if v is not None:
             cat[k] = v
     cat["updated_at"] = datetime.now(timezone.utc)
+    store.save_state()
     return cat
 
 @router.delete("/{category_id}")
@@ -59,4 +61,5 @@ async def delete_category(category_id: str, admin: dict = Depends(require_admin)
     if category_id not in store.categories:
         raise HTTPException(status_code=404, detail="Category not found")
     del store.categories[category_id]
+    store.save_state()
     return {"message": "Category deleted successfully"}

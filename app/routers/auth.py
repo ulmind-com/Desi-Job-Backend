@@ -46,6 +46,7 @@ async def register(req: RegisterRequest):
         "updated_at": now
     }
     store.users[user_id] = new_user
+    store.save_state()
     
     token = create_access_token({"sub": user_id, "email": new_user["email"], "role": new_user["role"], "name": new_user["name"]})
     return {
@@ -135,6 +136,7 @@ async def verify_token(req: FirebaseVerifyRequest):
             "updated_at": now
         }
         store.users[user_id] = user
+        store.save_state()
 
     token = create_access_token({"sub": user["id"], "email": user["email"], "role": user["role"], "name": user["name"]})
     return {
@@ -223,5 +225,6 @@ async def change_admin_password(
         "details": "Super Admin successfully updated their master password.",
         "timestamp": datetime.now(timezone.utc)
     })
+    store.save_state()
 
     return {"message": "Admin password successfully updated. Please use your new password on subsequent logins."}

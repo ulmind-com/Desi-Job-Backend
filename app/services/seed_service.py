@@ -1,8 +1,52 @@
+import asyncio
+import json
+import logging
 import uuid
 from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Any
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 from app.core.security import get_password_hash
 from app.core.config import settings
+from app.core.database import db_manager
+
+logger = logging.getLogger(__name__)
+
+STORE_FILE_PATH = Path(__file__).resolve().parents[2] / "data" / "store_state.json"
+
+DATETIME_KEYS = {"created_at", "updated_at", "timestamp", "applied_at"}
+
+
+def _serialize_value(val: Any) -> Any:
+    if isinstance(val, datetime):
+        return val.isoformat()
+    if isinstance(val, dict):
+        return {k: _serialize_value(v) for k, v in val.items()}
+    if isinstance(val, list):
+        return [_serialize_value(v) for v in val]
+    return val
+
+
+def _deserialize_value(val: Any, key: Optional[str] = None) -> Any:
+    if isinstance(val, str) and key in DATETIME_KEYS:
+        try:
+            return datetime.fromisoformat(val)
+        except Exception:
+            return val
+    if isinstance(val, dict):
+        return {k: _deserialize_value(v, k) for k, v in val.items()}
+    if isinstance(val, list):
+        return [_deserialize_value(v, key) for v in val]
+    return val
+
+
+def _default_visits() -> Dict[str, Any]:
+    return {
+        "total_visits": 0,
+        "unique_visitor_ids": [],
+        "daily": {},
+        "recent": [],
+    }
+
 
 class InMemoryStore:
     def __init__(self):
@@ -13,16 +57,145 @@ class InMemoryStore:
         self.resumes: Dict[str, Dict[str, Any]] = {}
         self.notifications: Dict[str, Dict[str, Any]] = {}
         self.audit_logs: List[Dict[str, Any]] = []
+        self.visits: Dict[str, Any] = _default_visits()
         self.initialized = False
+
+    def export_state(self) -> Dict[str, Any]:
+        return _serialize_value({
+            "users": self.users,
+            "categories": self.categories,
+            "jobs": self.jobs,
+            "applications": self.applications,
+            "resumes": self.resumes,
+            "notifications": self.notifications,
+            "audit_logs": self.audit_logs,
+            "visits": self.visits,
+        })
+
+    def import_state(self, raw: Dict[str, Any]) -> bool:
+        if not isinstance(raw, dict) or not raw.get("users"):
+            return False
+        self.users = _deserialize_value(raw.get("users", {}))
+        self.categories = _deserialize_value(raw.get("categories", {}))
+        self.jobs = _deserialize_value(raw.get("jobs", {}))
+        self.applications = _deserialize_value(raw.get("applications", {}))
+        self.resumes = _deserialize_value(raw.get("resumes", {}))
+        self.notifications = _deserialize_value(raw.get("notifications", {}))
+        self.audit_logs = _deserialize_value(raw.get("audit_logs", []))
+        visits = raw.get("visits") or {}
+        self.visits = {
+            "total_visits": int(visits.get("total_visits", 0)),
+            "unique_visitor_ids": list(visits.get("unique_visitor_ids", [])),
+            "daily": dict(visits.get("daily", {})),
+            "recent": list(visits.get("recent", [])),
+        }
+        return True
+
+    def save_state(self) -> None:
+        """Persist current store state to JSON file and schedule MongoDB sync if connected."""
+        payload = self.export_state()
+        try:
+            STORE_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+            tmp = STORE_FILE_PATH.with_suffix(".tmp")
+            tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+            tmp.replace(STORE_FILE_PATH)
+        except Exception as e:
+            logger.warning(f"Could not write {STORE_FILE_PATH}: {e}")
+
+        if db_manager.is_connected and db_manager.db is not None:
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(self.save_to_mongo(payload))
+            except RuntimeError:
+                pass
+
+    def load_state_from_file(self) -> bool:
+        if not STORE_FILE_PATH.exists():
+            return False
+        try:
+            raw = json.loads(STORE_FILE_PATH.read_text(encoding="utf-8"))
+            return self.import_state(raw)
+        except Exception as e:
+            logger.warning(f"Could not read {STORE_FILE_PATH}: {e}")
+            return False
+
+    async def save_to_mongo(self, payload: Optional[Dict[str, Any]] = None) -> None:
+        if not db_manager.is_connected or db_manager.db is None:
+            return
+        try:
+            doc = payload if payload is not None else self.export_state()
+            await db_manager.db.app_state.replace_one(
+                {"_id": "primary"},
+                {"_id": "primary", "state": doc, "updated_at": datetime.now(timezone.utc).isoformat()},
+                upsert=True,
+            )
+        except Exception as e:
+            logger.warning(f"Failed saving store state to MongoDB: {e}")
+
+    async def load_from_mongo(self) -> None:
+        if not db_manager.is_connected or db_manager.db is None:
+            return
+        try:
+            doc = await db_manager.db.app_state.find_one({"_id": "primary"})
+            if doc and isinstance(doc.get("state"), dict):
+                self.import_state(doc["state"])
+                logger.info("Restored store state from MongoDB.")
+            else:
+                await self.save_to_mongo()
+        except Exception as e:
+            logger.warning(f"Failed loading store state from MongoDB: {e}")
+
+    def record_visit(
+        self,
+        path: str = "/",
+        visitor_id: Optional[str] = None,
+        referrer: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        now = datetime.now(timezone.utc)
+        today_key = now.strftime("%Y-%m-%d")
+
+        self.visits["total_visits"] = int(self.visits.get("total_visits", 0)) + 1
+        uid = (visitor_id or "").strip()
+        if uid and uid not in self.visits["unique_visitor_ids"]:
+            self.visits["unique_visitor_ids"].append(uid)
+
+        daily = self.visits.setdefault("daily", {})
+        day_entry = daily.setdefault(today_key, {"visits": 0, "unique_ids": []})
+        day_entry["visits"] = int(day_entry.get("visits", 0)) + 1
+        if uid and uid not in day_entry["unique_ids"]:
+            day_entry["unique_ids"].append(uid)
+
+        recent = self.visits.setdefault("recent", [])
+        recent.append({
+            "path": (path or "/")[:200],
+            "visitor_id": uid or "anonymous",
+            "referrer": (referrer or "")[:200] or None,
+            "timestamp": now.isoformat(),
+        })
+        if len(recent) > 200:
+            self.visits["recent"] = recent[-200:]
+
+        self.save_state()
+        return {
+            "total_visits": self.visits["total_visits"],
+            "unique_visitors": len(self.visits["unique_visitor_ids"]),
+            "visits_today": day_entry["visits"],
+            "unique_visitors_today": len(day_entry["unique_ids"]),
+        }
 
     def initialize_seed_data(self):
         if self.initialized:
             return
-        
+
+        if self.load_state_from_file():
+            self.initialized = True
+            return
+
         now = datetime.now(timezone.utc)
         
-        # 1. Super Admin Account
+        # 1. Super Admin Account (Required for Admin Console login)
         admin_id = "user_admin_001"
+        employer_id = admin_id
         self.users[admin_id] = {
             "id": admin_id,
             "name": settings.SUPER_ADMIN_NAME,
@@ -39,49 +212,6 @@ class InMemoryStore:
             "is_active": True,
             "is_verified": True,
             "created_at": now - timedelta(days=30),
-            "updated_at": now
-        }
-        
-        # 2. Sample Employer
-        employer_id = "user_emp_001"
-        self.users[employer_id] = {
-            "id": employer_id,
-            "name": "Sarah Jenkins",
-            "email": "employer@techcorp.com",
-            "phone": "+1 (555) 342-8890",
-            "hashed_password": get_password_hash("Employer@123"),
-            "role": "employer",
-            "avatar_url": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150",
-            "location": "San Francisco, CA",
-            "headline": "Head of Talent Acquisition at TechCorp",
-            "about": "Hiring top engineering and design talents across the globe.",
-            "skills": ["Recruitment", "Talent Sourcing"],
-            "social_links": {},
-            "is_active": True,
-            "is_verified": True,
-            "created_at": now - timedelta(days=20),
-            "updated_at": now
-        }
-
-        # 3. Sample Job Seeker
-        seeker_id = "user_seeker_001"
-        self.users[seeker_id] = {
-            "id": seeker_id,
-            "name": "Alex Dom Bringer",
-            "email": "alex.dom@example.com",
-            "phone": "+1 (555) 789-1029",
-            "hashed_password": get_password_hash("Candidate@123"),
-            "role": "job_seeker",
-            "avatar_url": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150",
-            "location": "New York, NY",
-            "headline": "Senior Frontend Developer (React, Next.js, TypeScript)",
-            "about": "Passionate frontend engineer with 5 years of modern web development experience.",
-            "skills": ["React", "Next.js", "TypeScript", "Tailwind CSS", "Redux"],
-            "social_links": {"github": "https://github.com", "linkedin": "https://linkedin.com"},
-            "is_active": True,
-            "is_verified": True,
-            "default_resume_id": "res_001",
-            "created_at": now - timedelta(days=15),
             "updated_at": now
         }
 
@@ -119,7 +249,7 @@ class InMemoryStore:
                 "description": f"Verified open positions and providers in {cat['name']}",
                 "is_active": True,
                 "display_order": idx + 1,
-                "jobs_count": cat["count"],
+                "jobs_count": 0,
                 "created_at": now,
                 "updated_at": now
             }
@@ -401,119 +531,33 @@ class InMemoryStore:
         ]
 
         for job in sample_jobs:
+            job["employer_id"] = admin_id
+            job["employer_name"] = job.get("company", "Desi Jobs Official")
+            job["applications_count"] = 0
+            job["views_count"] = 0
             self.jobs[job["id"]] = job
 
-        # 6. Sample Resume for Seeker
-        self.resumes["res_001"] = {
-            "id": "res_001",
-            "user_id": seeker_id,
-            "title": "Primary Technical Resume",
-            "data": {
-                "full_name": "Alex Dom Bringer",
-                "email": "alex.dom@example.com",
-                "phone": "+1 (555) 789-1029",
-                "location": "New York, NY",
-                "professional_summary": "Seasoned Frontend Developer with extensive expertise in Next.js, TypeScript, React Hook Form, and responsive design systems.",
-                "education": [
-                    {
-                        "institution": "Columbia University",
-                        "degree": "B.S. in Computer Science",
-                        "department": "Engineering & Applied Science",
-                        "graduation_year": "2021",
-                        "grade_or_cgpa": "3.85 GPA"
-                    }
-                ],
-                "experience": [
-                    {
-                        "company": "Vanguard Web Studios",
-                        "title": "Frontend Engineer",
-                        "start_date": "Aug 2021",
-                        "end_date": "Present",
-                        "is_current": True,
-                        "responsibilities": [
-                            "Built high-concurrency client portal in Next.js",
-                            "Reduced bundle size by 40% using code splitting"
-                        ]
-                    }
-                ],
-                "skills": ["React", "Next.js", "TypeScript", "Tailwind CSS", "Zod", "REST APIs"],
-                "soft_skills": ["Team Leadership", "Agile Sprints", "Clear Documentation"],
-                "certifications": ["Meta Frontend Developer Professional Certificate"],
-                "projects": [
-                    {
-                        "title": "E-Commerce Microfrontend",
-                        "description": "Modular shopping flow with 99.9% uptime and zero latency spikes.",
-                        "technologies": ["React", "TypeScript", "Tailwind"],
-                        "link": "https://github.com"
-                    }
-                ],
-                "languages": ["English", "Spanish"],
-                "uncertain_fields": []
-            },
-            "is_default": True,
-            "source_type": "manual",
-            "source_image_url": None,
-            "pdf_download_url": "/uploads/resumes/res_001.pdf",
-            "created_at": now - timedelta(days=10),
-            "updated_at": now
-        }
+        # Update category jobs_count strictly from actual jobs
+        for cat_id, cat in self.categories.items():
+            cat_name = cat["name"]
+            cat["jobs_count"] = sum(
+                1 for j in self.jobs.values()
+                if (j.get("category") == cat_name or j.get("category_id") == cat_id) and j.get("status") == "active"
+            )
 
-        # 7. Sample Applications for Admin Dashboard
-        app_candidates = [
-            ("Alex Dom Bringer", "alex.dom@example.com", "+1 555-789-1029", "Shortlisted", "job_001"),
-            ("Sarah Conner", "sarah.c@example.com", "+1 555-234-5678", "Interview Scheduled", "job_001"),
-            ("Marcus Vance", "marcus.v@example.com", "+1 555-345-6789", "Screening", "job_002"),
-            ("Priya Patel", "priya.p@example.com", "+1 555-456-7890", "Selected", "job_001"),
-            ("David Kim", "david.k@example.com", "+1 555-567-8901", "Applied", "job_003"),
-            ("Elena Rostova", "elena.r@example.com", "+1 555-678-9012", "Rejected", "job_004"),
-        ]
-
-        for idx, (c_name, c_email, c_phone, status, j_id) in enumerate(app_candidates):
-            app_id = f"app_00{idx + 1}"
-            target_job = self.jobs.get(j_id, sample_jobs[0])
-            self.applications[app_id] = {
-                "id": app_id,
-                "job_id": j_id,
-                "job_title": target_job["title"],
-                "company_name": target_job["company"],
-                "job_location": target_job["location"],
-                "user_id": seeker_id if idx == 0 else f"cand_00{idx+1}",
-                "full_name": c_name,
-                "email": c_email,
-                "phone": c_phone,
-                "cover_letter": "I am thrilled to apply for this position and bring my hands-on technical skills to your team.",
-                "resume_id": "res_001",
-                "resume_snapshot": self.resumes["res_001"]["data"],
-                "status": status,
-                "employer_notes": "Strong background in relevant tech stack.",
-                "created_at": now - timedelta(days=idx + 1),
-                "updated_at": now - timedelta(hours=idx * 2)
-            }
-
-        # 8. Notifications
-        self.notifications["notif_001"] = {
-            "id": "notif_001",
-            "user_id": seeker_id,
-            "title": "Application Status Updated",
-            "message": "Your application for Sr. Full Stack Engineer at TechNova Labs has been Shortlisted!",
-            "type": "status_update",
-            "link": "/dashboard?tab=applications",
-            "is_read": False,
-            "created_at": now - timedelta(hours=3)
-        }
-
-        # 9. Audit Logs
+        # No fake resumes, applications, or candidate notifications seeded!
         self.audit_logs.append({
             "id": "log_001",
             "admin_email": settings.SUPER_ADMIN_EMAIL,
             "action": "SYSTEM_INITIALIZATION",
             "resource_type": "SYSTEM",
             "resource_id": "all",
-            "details": "Platform seed database initialized with core configurations and roles.",
-            "timestamp": now - timedelta(days=1)
+            "details": "Platform initialized with live tracking enabled and zero dummy user/applicant data.",
+            "timestamp": now
         })
 
         self.initialized = True
+        self.save_state()
 
 store = InMemoryStore()
 store.initialize_seed_data()

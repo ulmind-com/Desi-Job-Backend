@@ -28,6 +28,7 @@ async def update_my_profile(req: UserUpdateRequest, payload: dict = Depends(get_
         if v is not None:
             user[k] = v
     user["updated_at"] = datetime.now(timezone.utc)
+    store.save_state()
     
     safe = user.copy()
     safe.pop("hashed_password", None)
