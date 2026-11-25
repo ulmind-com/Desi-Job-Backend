@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Body, HTTPException, Depends, Query
 from app.core.security import require_admin
 from app.services.seed_service import store
+from app.services.email_service import send_email, send_status_update_email
 from app.schemas.job import JobCreate, JobUpdate
 
 router = APIRouter(prefix="/admin", tags=["Super Admin Panel"])
@@ -612,6 +613,13 @@ async def admin_update_application_status(
         "timestamp": datetime.now(timezone.utc),
     })
     store.save_state()
+    if app.get("status") != old_status:
+        send_status_update_email(
+            applicant_email=app.get("email", ""),
+            applicant_name=app.get("full_name", "Candidate"),
+            job_title=app.get("job_title", "Position"),
+            new_status=status,
+        )
     return {"message": "Application status updated", "application": app}
 
 
@@ -722,6 +730,17 @@ async def admin_update_resume(
     admin: dict = Depends(require_admin),
 ):
     r = store.resumes.get(resume_id)
+    if not r and resume_id.startswith("app_snap_"):
+        app_id = resume_id.replace("app_snap_", "", 1)
+        app = store.applications.get(app_id)
+        if app and isinstance(app.get("resume_snapshot"), dict):
+            snap = app["resume_snapshot"]
+            for field in ["full_name", "email", "phone", "location", "headline", "professional_summary", "skills"]:
+                if field in payload and payload[field] is not None:
+                    snap[field] = payload[field]
+            app["updated_at"] = datetime.now(timezone.utc)
+            store.save_state()
+            return {"message": "Resume snapshot updated", "resume": {"id": resume_id, "title": payload.get("title") or app.get("job_title"), "data": snap}}
     if not r:
         raise HTTPException(status_code=404, detail="Resume not found")
 
@@ -751,6 +770,14 @@ async def admin_update_resume(
 @router.delete("/resumes/{resume_id}")
 async def admin_delete_resume(resume_id: str, admin: dict = Depends(require_admin)):
     r = store.resumes.get(resume_id)
+    if not r and resume_id.startswith("app_snap_"):
+        app_id = resume_id.replace("app_snap_", "", 1)
+        app = store.applications.get(app_id)
+        if app and app.get("resume_snapshot") is not None:
+            app["resume_snapshot"] = None
+            app["updated_at"] = datetime.now(timezone.utc)
+            store.save_state()
+            return {"message": "Application resume snapshot deleted successfully"}
     if not r:
         raise HTTPException(status_code=404, detail="Resume not found")
 
@@ -771,6 +798,22 @@ async def admin_delete_resume(resume_id: str, admin: dict = Depends(require_admi
     })
     store.save_state()
     return {"message": "Resume deleted successfully"}
+
+
+@router.post("/test-email")
+async def admin_send_test_email(
+    payload: Dict[str, Any] = Body(...),
+    admin: dict = Depends(require_admin),
+):
+    to_email = str(payload.get("to") or "").strip()
+    if not to_email:
+        raise HTTPException(status_code=400, detail="Recipient email 'to' is required")
+    subject = str(payload.get("subject") or "Desi Jobs Email Delivery Test")
+    html = str(payload.get("html") or "<p>Hello from Desi Jobs (noreply@hireadesi.com) via Resend!</p>")
+    result = await send_email(to=to_email, subject=subject, html=html)
+    if not result.get("sent"):
+        raise HTTPException(status_code=502, detail=result)
+    return result
 
 
 @router.get("/audit-logs")

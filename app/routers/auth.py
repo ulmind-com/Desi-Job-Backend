@@ -12,6 +12,7 @@ from app.core.security import (
 from app.core.firebase import verify_firebase_id_token
 from app.core.config import settings
 from app.services.seed_service import store
+from app.services.email_service import send_welcome_email
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -47,6 +48,7 @@ async def register(req: RegisterRequest):
     }
     store.users[user_id] = new_user
     store.save_state()
+    send_welcome_email(new_user["email"], new_user["name"], new_user["role"])
     
     token = create_access_token({"sub": user_id, "email": new_user["email"], "role": new_user["role"], "name": new_user["name"]})
     return {
@@ -137,6 +139,7 @@ async def verify_token(req: FirebaseVerifyRequest):
         }
         store.users[user_id] = user
         store.save_state()
+        send_welcome_email(user["email"], user["name"], user["role"])
 
     token = create_access_token({"sub": user["id"], "email": user["email"], "role": user["role"], "name": user["name"]})
     return {

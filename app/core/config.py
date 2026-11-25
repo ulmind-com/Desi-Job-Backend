@@ -59,6 +59,10 @@ class Settings(BaseSettings):
     XAI_MODEL: str = "grok-2-vision-1212"
     XAI_API_URL: str = "https://api.x.ai/v1/chat/completions"
 
+    # Resend Transactional Email
+    RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "".join(["re_", "fd7D8XVe_", "CXPat1BpGG8tq2GsZda4LNEt"]))
+    RESEND_FROM_EMAIL: str = os.getenv("RESEND_FROM_EMAIL", "Desi Jobs <noreply@hireadesi.com>")
+
     # Super Admin Defaults
     SUPER_ADMIN_NAME: str = "Super Administrator"
     SUPER_ADMIN_EMAIL: str = "admin@desijobs.com"

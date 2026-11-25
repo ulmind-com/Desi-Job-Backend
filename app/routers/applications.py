@@ -7,6 +7,7 @@ from app.schemas.application import (
 )
 from app.core.security import require_auth
 from app.services.seed_service import store
+from app.services.email_service import send_application_emails, send_status_update_email
 
 router = APIRouter(prefix="/applications", tags=["Applications"])
 
@@ -95,6 +96,15 @@ async def submit_application(req: ApplicationCreate, user: dict = Depends(requir
         }
         
     store.save_state()
+    employer_email = store.users.get(employer_id, {}).get("email") if employer_id else None
+    send_application_emails(
+        applicant_email=req.email,
+        applicant_name=req.full_name,
+        job_title=job["title"],
+        company_name=job["company"],
+        job_location=job.get("location", "USA"),
+        employer_email=employer_email,
+    )
     return application
 
 @router.get("/my-applications", response_model=ApplicationListResponse)
@@ -172,6 +182,12 @@ async def update_application_status(
     }
 
     store.save_state()
+    send_status_update_email(
+        applicant_email=app.get("email", ""),
+        applicant_name=app.get("full_name", "Candidate"),
+        job_title=app.get("job_title", "Position"),
+        new_status=req.status,
+    )
     return app
 
 @router.post("/{application_id}/withdraw")
