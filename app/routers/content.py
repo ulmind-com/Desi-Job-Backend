@@ -101,10 +101,17 @@ async def _persist(section: str) -> None:
             logger.warning(f"Could not write site_content to MongoDB: {e}")
 
 
+NON_US_LEGACY_CITIES = {"kolkata", "mumbai", "delhi", "bengaluru", "london"}
+
+
 def _merged(section: str) -> Any:
-    if section in cache.sections:
-        return cache.sections[section]
-    return copy.deepcopy(DEFAULTS[section])
+    data = copy.deepcopy(cache.sections[section]) if section in cache.sections else copy.deepcopy(DEFAULTS[section])
+    if section == "hero" and isinstance(data, dict):
+        cities = data.get("cities")
+        if not isinstance(cities, list) or any(str(c).strip().lower() in NON_US_LEGACY_CITIES for c in cities):
+            data["cities"] = copy.deepcopy(DEFAULTS["hero"]["cities"])
+        data["countries"] = ["USA"]
+    return data
 
 
 def _require_known(section: str) -> None:
